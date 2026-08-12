@@ -1566,6 +1566,7 @@
     <string name="discovery_page_interface">发现页界面</string>
     <string name="switch_discovery_page_interface">切换发现页界面</string>
     <string name="discovery_category">分类</string>
+    <string name="discovery_channel">频道</string>
     <string name="discovery_page_mode_legacy">经典</string>
     <string name="discovery_page_mode_modern">现代</string>
     <string name="discovery_suite_no_suite">无套件</string>

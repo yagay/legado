@@ -3195,7 +3195,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private fun updateDiscoverTagFilterButtonState() {
-        val enabled = discoverMajorGroups.size > 1
+        val enabled = !usingModernDiscovery && discoverMajorGroups.size > 1
         binding.topBar.filterButton.isVisible = enabled
         binding.topBar.filterButton.isEnabled = enabled
         binding.topBar.filterButton.alpha = if (enabled) 1f else 0.45f
@@ -3276,31 +3276,29 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             val click: (Int) -> Unit
         )
         val actions = mutableListOf<RowAction>()
-        discoverSelectItems.forEach { item ->
-            val options = item.kind.chars?.filterNotNull().orEmpty()
-            if (options.isNotEmpty()) {
-                val current = currentDiscoverSelectValue(item)
-                actions += RowAction(
-                    io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
-                        title = item.text,
-                        options = options,
-                        selectedIndex = options.indexOf(current)
-                    )
-                ) { optionIndex ->
-                    options.getOrNull(optionIndex)?.let { value ->
-                        applyDiscoverSelectValue(item, value)
+        if (discoverMajorGroups.isNotEmpty()) {
+            actions += RowAction(
+                io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                    title = getString(R.string.discovery_channel),
+                    options = discoverMajorGroups,
+                    selectedIndex = discoverMajorGroups.indexOf(selectedDiscoverMajorGroup)
+                )
+            ) { optionIndex ->
+                discoverMajorGroups.getOrNull(optionIndex)?.let { group ->
+                    if (group != selectedDiscoverMajorGroup) {
+                        selectedDiscoverMajorGroup = group
+                        applyDiscoverTagFilterAndSelect(preferredUrl = null)
                     }
                 }
             }
-        }
-        discoverMajorGroups.forEach { group ->
+            val group = selectedDiscoverMajorGroup ?: discoverMajorGroups.first()
             val items = discoverAllTagItems.filter {
                 it.group == group && !it.isButton && !it.kind.url.isNullOrBlank()
             }
             if (items.isNotEmpty()) {
                 actions += RowAction(
                     io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
-                        title = group,
+                        title = getString(R.string.discovery_category),
                         options = items.map { it.text },
                         selectedIndex = items.indexOfFirst { it.kind.url == discoverCurrentUrl }
                     )
@@ -3314,8 +3312,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     }
                 }
             }
-        }
-        if (discoverMajorGroups.isEmpty()) {
+        } else {
             val items = discoverTagItems.filter { !it.isButton && !it.kind.url.isNullOrBlank() }
             if (items.isNotEmpty()) {
                 actions += RowAction(
@@ -3329,6 +3326,23 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                         val index = discoverTagItems.indexOf(item)
                         selectDiscoverTag(index, item, selectTab = false)
                         renderModernDiscoveryFilterRows()
+                    }
+                }
+            }
+        }
+        discoverSelectItems.forEach { item ->
+            val options = item.kind.chars?.filterNotNull().orEmpty()
+            if (options.isNotEmpty()) {
+                val current = currentDiscoverSelectValue(item)
+                actions += RowAction(
+                    io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                        title = item.text,
+                        options = options,
+                        selectedIndex = options.indexOf(current)
+                    )
+                ) { optionIndex ->
+                    options.getOrNull(optionIndex)?.let { value ->
+                        applyDiscoverSelectValue(item, value)
                     }
                 }
             }
