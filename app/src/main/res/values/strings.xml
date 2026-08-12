@@ -1675,6 +1675,7 @@
     <string name="read_record_open_book_info">Open book details</string>
     <string name="discovery_page_mode_suite">Suite discovery</string>
     <string name="discovery_page_interface">Discovery page interface</string>
+    <string name="switch_discovery_page_interface">Switch discovery page interface</string>
     <string name="discovery_page_mode_legacy">Classic</string>
     <string name="discovery_page_mode_modern">Modern</string>
     <string name="discovery_suite_no_suite">No suite</string>

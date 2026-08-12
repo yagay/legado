@@ -353,8 +353,40 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             return
         }
         menuInflater.inflate(R.menu.main_explore, menu)
+        menu.add(
+            Menu.NONE,
+            R.id.menu_discovery_page_mode,
+            Menu.NONE,
+            R.string.switch_discovery_page_interface
+        ).setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
         groupsMenu = menu.findItem(R.id.menu_group)?.subMenu
         upGroupsMenu()
+    }
+
+    private fun showDiscoveryPageModeSelector() {
+        val values = listOf(
+            AppConfig.DISCOVERY_PAGE_MODE_LEGACY,
+            AppConfig.DISCOVERY_PAGE_MODE_MODERN,
+            AppConfig.DISCOVERY_PAGE_MODE_SUITE
+        )
+        val labels = listOf(
+            getString(R.string.discovery_page_mode_legacy),
+            getString(R.string.discovery_page_mode_modern),
+            getString(R.string.discovery_page_mode_suite)
+        )
+        showComposeChoiceListDialog(
+            title = getString(R.string.discovery_page_interface),
+            labels = labels,
+            selectedIndex = values.indexOf(AppConfig.discoveryPageMode)
+        ) { index ->
+            values.getOrNull(index)?.let { mode ->
+                if (mode != AppConfig.discoveryPageMode) {
+                    AppConfig.discoveryPageMode = mode
+                    applyDiscoveryMode(loadData = true)
+                    activity?.invalidateOptionsMenu()
+                }
+            }
+        }
     }
 
     private fun applyDiscoveryMode(loadData: Boolean = true) {
@@ -1998,6 +2030,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.topBar.filterButton.setOnClickListener {
             showDiscoverTagFilterMenu()
         }
+        binding.topBar.moreButton.isVisible = true
+        binding.topBar.moreButton.setOnClickListener {
+            showDiscoveryPageModeSelector()
+        }
         updateDiscoverTagFilterButtonState()
         updateDiscoverSearchButtonState()
     }
@@ -2008,7 +2044,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val actionsWidth = listOf(
             binding.topBar.searchButton,
             binding.topBar.filterButton,
-            binding.topBar.loginButton
+            binding.topBar.loginButton,
+            binding.topBar.moreButton
         ).filter { it.isVisible }.sumOf { it.measuredWidth.takeIf { width -> width > 0 } ?: it.layoutParams.width }
         val spacing = 36.dpToPx()
         val maxWidth = (rowWidth - actionsWidth - spacing).coerceIn(96.dpToPx(), 190.dpToPx())
@@ -3672,6 +3709,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     override fun onCompatOptionsItemSelected(item: MenuItem) {
         super.onCompatOptionsItemSelected(item)
+        if (item.itemId == R.id.menu_discovery_page_mode) {
+            showDiscoveryPageModeSelector()
+            return
+        }
         if (usingModernDiscovery || usingSuiteDiscovery) return
         if (item.groupId == R.id.menu_group_text) {
             searchView?.setQuery("group:${item.title}", true) ?: upExploreData("group:${item.title}")

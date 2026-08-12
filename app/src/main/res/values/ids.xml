@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <item name="menu_discovery_page_mode" type="id" />
 
     <item name="tag" type="id" />
     <item name="tag1" type="id" />
