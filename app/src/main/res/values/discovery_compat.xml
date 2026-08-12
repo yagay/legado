@@ -1,0 +1,21 @@
+<resources>
+    <string name="cover_collection_no_images_to_export">No images to export</string>
+    <string name="cover_collection_export_failed_simple">Export failed</string>
+    <string name="cover_collection_zip_no_images">No images found in archive</string>
+    <string name="top_bar_name_exists">A top bar with this name already exists</string>
+    <string name="top_bar_config_missing">Top bar configuration is missing</string>
+    <string name="top_bar_night_default_name">Default night top bar</string>
+    <string name="top_bar_day_default_name">Default day top bar</string>
+    <dimen name="bookshelf_tag_recycler_padding_vertical">4dp</dimen>
+    <dimen name="bookshelf_tag_bar_padding_horizontal">8dp</dimen>
+    <dimen name="bookshelf_tag_bar_padding_vertical">4dp</dimen>
+    <dimen name="bookshelf_tag_item_padding_horizontal">10dp</dimen>
+    <dimen name="waterfall_card_gap">8dp</dimen>
+    <dimen name="waterfall_card_min_width">148dp</dimen>
+    <dimen name="waterfall_card_min_height">210dp</dimen>
+    <dimen name="waterfall_cover_min_height">180dp</dimen>
+    <integer name="waterfall_card_height_ratio_x100">145</integer>
+    <integer name="waterfall_cover_height_ratio_x100">133</integer>
+    <color name="dialog_surface">#FFF7F7F7</color>
+    <item name="ui_title_typeface_role" type="id"/>
+</resources>

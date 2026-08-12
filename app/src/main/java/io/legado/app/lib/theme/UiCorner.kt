@@ -158,11 +158,11 @@ object UiCorner {
         val bitmap = loadPanelBitmap(path) ?: return null
         val mode = context.getPrefString(
             if (AppConfig.isNightTheme) PreferKey.panelBgScaleTypeN else PreferKey.panelBgScaleType
-        ) ?: ThemeConfig.PANEL_BG_CROP
+        ) ?: "crop"
         return RoundedBitmapDrawable(
             bitmap = bitmap,
             radius = radius,
-            fitInside = mode == ThemeConfig.PANEL_BG_FIT,
+            fitInside = mode == "fit",
             alphaMultiplier = alphaMultiplier
         )
     }

@@ -2,7 +2,6 @@ package io.legado.app.help.config
 
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.getFile
-import io.legado.app.utils.isSameOrSubFileOf
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipFile
@@ -80,7 +79,9 @@ internal object RedAssetPackage {
         ZipFile(zipFile).use { zip ->
             zip.entries().asSequence().forEach { entry ->
                 val target = File(targetDir, entry.name)
-                if (!target.isSameOrSubFileOf(targetDir)) {
+                val rootPath = targetDir.canonicalFile.path + File.separator
+                if (target.canonicalFile.path != targetDir.canonicalFile.path &&
+                    !target.canonicalFile.path.startsWith(rootPath)) {
                     throw IllegalArgumentException("Invalid RED package")
                 }
                 if (entry.isDirectory) {
@@ -110,4 +111,3 @@ internal object RedAssetPackage {
         } >= 3
     }
 }
-

@@ -179,7 +179,7 @@ fun Context.themeUiSignature(): String {
         "shelf=${themeShelfColorOrDefault()}",
         "divider=${themeDividerColorOrDefault()}"
     ).joinToString("|")
-    return "mode=$themeMode|night=${AppConfig.isNightTheme}|eInk=${AppConfig.isEInkMode}|themeStore=${ThemeStore.valuesChanged(this)}|$rawPrefs|$shapePrefs|$computedColors"
+    return "mode=$themeMode|night=${AppConfig.isNightTheme}|eInk=${AppConfig.isEInkMode}|$rawPrefs|$shapePrefs|$computedColors"
 }
 
 private fun Context.themePanelImageSignature(): String {

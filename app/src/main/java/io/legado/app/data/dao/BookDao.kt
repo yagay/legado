@@ -6,19 +6,19 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.TypeConverters
 import androidx.room.Update
-import com.google.gson.JsonObject
 import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
-import io.legado.app.data.entities.BookCacheCleanupSnapshot
-import io.legado.app.data.entities.BookCacheInfo
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
 import io.legado.app.help.book.isNotShelf
-import io.legado.app.utils.GSON
-import io.legado.app.utils.fromJsonObject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
+import kotlin.math.max
+import kotlin.math.min
 
 @Dao
 interface BookDao {
@@ -39,6 +39,20 @@ interface BookDao {
         }
     }
 
+    fun flowShelfByGroup(groupId: Long): Flow<List<BookShelfDisplay>> {
+        return when (groupId) {
+            BookGroup.IdRoot -> flowShelfRoot()
+            BookGroup.IdAll -> flowShelfAll()
+            BookGroup.IdLocal -> flowShelfLocal()
+            BookGroup.IdAudio -> flowShelfAudio()
+            BookGroup.IdNetNone -> flowShelfNetNoGroup()
+            BookGroup.IdLocalNone -> flowShelfLocalNoGroup()
+            BookGroup.IdVideo -> flowShelfVideo()
+            BookGroup.IdError -> flowShelfUpdateError()
+            else -> flowShelfByUserGroup(groupId)
+        }
+    }
+
     @Query(
         """
         select * from books where type & ${BookType.text} > 0
@@ -51,6 +65,167 @@ interface BookDao {
 
     @Query("SELECT * FROM books order by durChapterTime desc")
     fun flowAll(): Flow<List<Book>>
+
+    @Query(
+        """
+        SELECT bookUrl, origin, originName, name, author, intro, customIntro, customTag, coverUrl, customCoverUrl,
+        type, `group`, latestChapterTitle, latestChapterTime, lastCheckCount, totalChapterNum,
+        durChapterTitle, durChapterIndex, durChapterTime, canUpdate, `order`, readConfig
+        FROM books
+        WHERE (type & ${BookType.notShelf}) = 0
+        ORDER BY durChapterTime DESC
+        """
+    )
+    fun flowShelfAll(): Flow<List<BookShelfDisplay>>
+
+    @Query(
+        """
+        SELECT bookUrl, origin, originName, name, author, intro, customIntro, customTag, coverUrl, customCoverUrl,
+        type, `group`, latestChapterTitle, latestChapterTime, lastCheckCount, totalChapterNum,
+        durChapterTitle, durChapterIndex, durChapterTime, canUpdate, `order`, readConfig
+        FROM books
+        WHERE (type & ${BookType.notShelf}) = 0
+        AND (type & ${BookType.text}) > 0
+        AND (type & ${BookType.local}) = 0
+        AND ((SELECT sum(groupId) FROM book_groups where groupId > 0) & `group`) = 0
+        AND (select show from book_groups where groupId = ${BookGroup.IdNetNone}) != 1
+        ORDER BY durChapterTime DESC
+        """
+    )
+    fun flowShelfRoot(): Flow<List<BookShelfDisplay>>
+
+    @Query(
+        """
+        SELECT bookUrl, origin, originName, name, author, intro, customIntro, customTag, coverUrl, customCoverUrl,
+        type, `group`, latestChapterTitle, latestChapterTime, lastCheckCount, totalChapterNum,
+        durChapterTitle, durChapterIndex, durChapterTime, canUpdate, `order`, readConfig
+        FROM books
+        WHERE (type & ${BookType.notShelf}) = 0
+        AND (type & ${BookType.audio}) > 0
+        ORDER BY durChapterTime DESC
+        """
+    )
+    fun flowShelfAudio(): Flow<List<BookShelfDisplay>>
+
+    @Query(
+        """
+        SELECT bookUrl, origin, originName, name, author, intro, customIntro, customTag, coverUrl, customCoverUrl,
+        type, `group`, latestChapterTitle, latestChapterTime, lastCheckCount, totalChapterNum,
+        durChapterTitle, durChapterIndex, durChapterTime, canUpdate, `order`, readConfig
+        FROM books
+        WHERE (type & ${BookType.notShelf}) = 0
+        AND (type & ${BookType.video}) > 0
+        ORDER BY durChapterTime DESC
+        """
+    )
+    fun flowShelfVideo(): Flow<List<BookShelfDisplay>>
+
+    @Query(
+        """
+        SELECT bookUrl, origin, originName, name, author, intro, customIntro, customTag, coverUrl, customCoverUrl,
+        type, `group`, latestChapterTitle, latestChapterTime, lastCheckCount, totalChapterNum,
+        durChapterTitle, durChapterIndex, durChapterTime, canUpdate, `order`, readConfig
+        FROM books
+        WHERE (type & ${BookType.notShelf}) = 0
+        AND (type & ${BookType.local}) > 0
+        ORDER BY durChapterTime DESC
+        """
+    )
+    fun flowShelfLocal(): Flow<List<BookShelfDisplay>>
+
+    @Query(
+        """
+        SELECT bookUrl, origin, originName, name, author, intro, customIntro, customTag, coverUrl, customCoverUrl,
+        type, `group`, latestChapterTitle, latestChapterTime, lastCheckCount, totalChapterNum,
+        durChapterTitle, durChapterIndex, durChapterTime, canUpdate, `order`, readConfig
+        FROM books
+        WHERE (type & ${BookType.notShelf}) = 0
+        AND (type & ${BookType.audio}) = 0
+        AND (type & ${BookType.local}) = 0
+        AND (type & ${BookType.video}) = 0
+        AND ((SELECT sum(groupId) FROM book_groups where groupId > 0) & `group`) = 0
+        ORDER BY durChapterTime DESC
+        """
+    )
+    fun flowShelfNetNoGroup(): Flow<List<BookShelfDisplay>>
+
+    @Query(
+        """
+        SELECT bookUrl, origin, originName, name, author, intro, customIntro, customTag, coverUrl, customCoverUrl,
+        type, `group`, latestChapterTitle, latestChapterTime, lastCheckCount, totalChapterNum,
+        durChapterTitle, durChapterIndex, durChapterTime, canUpdate, `order`, readConfig
+        FROM books
+        WHERE (type & ${BookType.notShelf}) = 0
+        AND (type & ${BookType.local}) > 0
+        AND ((SELECT sum(groupId) FROM book_groups where groupId > 0) & `group`) = 0
+        ORDER BY durChapterTime DESC
+        """
+    )
+    fun flowShelfLocalNoGroup(): Flow<List<BookShelfDisplay>>
+
+    @Query(
+        """
+        SELECT bookUrl, origin, originName, name, author, intro, customIntro, customTag, coverUrl, customCoverUrl,
+        type, `group`, latestChapterTitle, latestChapterTime, lastCheckCount, totalChapterNum,
+        durChapterTitle, durChapterIndex, durChapterTime, canUpdate, `order`, readConfig
+        FROM books
+        WHERE (type & ${BookType.notShelf}) = 0
+        AND (`group` & :group) > 0
+        ORDER BY durChapterTime DESC
+        """
+    )
+    fun flowShelfByUserGroup(group: Long): Flow<List<BookShelfDisplay>>
+
+    @Query(
+        """
+        SELECT bookUrl, origin, originName, name, author, intro, customIntro, customTag, coverUrl, customCoverUrl,
+        type, `group`, latestChapterTitle, latestChapterTime, lastCheckCount, totalChapterNum,
+        durChapterTitle, durChapterIndex, durChapterTime, canUpdate, `order`, readConfig
+        FROM books
+        WHERE (type & ${BookType.notShelf}) = 0
+        AND (type & ${BookType.updateError}) > 0
+        ORDER BY durChapterTime DESC
+        """
+    )
+    fun flowShelfUpdateError(): Flow<List<BookShelfDisplay>>
+
+    @Query("SELECT bookUrl, name, author, (type & ${BookType.notShelf}) > 0 AS isNotShelf FROM books")
+    fun flowShelfIdentities(): Flow<List<BookShelfIdentity>>
+
+    @Query(
+        """
+        SELECT bookUrl, name, author, origin, originName, coverUrl, customCoverUrl,
+        durChapterTime, type FROM books
+        WHERE bookUrl IN (:bookUrls)
+        """
+    )
+    fun getDisplayInfosByUrls(bookUrls: List<String>): List<BookDisplayInfo>
+
+    @Query(
+        """
+        SELECT bookUrl, name, author, origin, originName, coverUrl, customCoverUrl,
+        durChapterTime, type FROM books
+        WHERE name IN (:names)
+        AND bookUrl = (
+            SELECT b2.bookUrl FROM books b2
+            WHERE b2.name = books.name
+            ORDER BY b2.durChapterTime DESC, b2.bookUrl ASC
+            LIMIT 1
+        )
+        """
+    )
+    fun getLatestDisplayInfosByNames(names: List<String>): List<BookDisplayInfo>
+
+    @Query(
+        """
+        SELECT bookUrl, name, author, origin, originName, coverUrl, customCoverUrl,
+        durChapterTime, type FROM books
+        WHERE name like '%'||:key||'%' or author like '%'||:key||'%'
+        ORDER BY durChapterTime DESC
+        LIMIT :limit
+        """
+    )
+    fun flowSearchDisplayInfos(key: String, limit: Int = 80): Flow<List<BookDisplayInfo>>
 
     @Query("SELECT * FROM books WHERE type & ${BookType.audio} > 0")
     fun flowAudio(): Flow<List<Book>>
@@ -95,17 +270,22 @@ interface BookDao {
     @Query("select * from books where originName = :fileName")
     fun getBookByFileName(fileName: String): Book?
 
-    @get:Query("SELECT originName FROM books WHERE type & ${BookType.local} > 0")
-    val localBookFileNames: List<String>
-
-    @get:Query(
-        "SELECT origin FROM books WHERE type & ${BookType.local} > 0 " +
-            "AND origin != '${BookType.localTag}'"
-    )
-    val localBookAlternateOrigins: List<String>
-
     @Query("SELECT * FROM books WHERE bookUrl = :bookUrl")
     fun getBook(bookUrl: String): Book?
+
+    @Query("SELECT * FROM books WHERE bookUrl IN (:bookUrls)")
+    fun getBooks(bookUrls: List<String>): List<Book>
+
+    fun getBooksSafe(bookUrls: List<String>, chunkSize: Int = 100): List<Book> {
+        if (bookUrls.isEmpty()) return emptyList()
+        val bookMap = bookUrls
+            .filter { it.isNotBlank() }
+            .distinct()
+            .chunked(chunkSize)
+            .flatMap { getBooks(it) }
+            .associateBy { it.bookUrl }
+        return bookUrls.mapNotNull { bookMap[it] }
+    }
 
     @Query("SELECT * FROM books WHERE name = :name and author = :author")
     fun getBook(name: String, author: String): Book?
@@ -127,22 +307,18 @@ interface BookDao {
     @get:Query("SELECT * FROM books where type & ${BookType.local} = 0 and canUpdate = 1")
     val hasUpdateBooks: List<Book>
 
+    @get:Query(
+        """
+        SELECT bookUrl, origin, type, totalChapterNum, durChapterIndex, readConfig
+        FROM books
+        WHERE type & ${BookType.local} = 0
+        AND canUpdate = 1
+        """
+    )
+    val updateBookInfos: List<BookUpdateInfo>
+
     @get:Query("SELECT * FROM books")
     val all: List<Book>
-
-    @Query("SELECT bookUrl, name, origin, originName, type FROM books")
-    fun getCacheCleanupBooks(): List<BookCacheInfo>
-
-    @Query("SELECT * FROM books WHERE (type & ${BookType.image}) > 0")
-    fun getCacheCleanupImageBooks(): List<Book>
-
-    @Transaction
-    fun getCacheCleanupSnapshot(includeImageBooks: Boolean): BookCacheCleanupSnapshot {
-        return BookCacheCleanupSnapshot(
-            books = getCacheCleanupBooks(),
-            imageBooks = if (includeImageBooks) getCacheCleanupImageBooks() else emptyList(),
-        )
-    }
 
     @Query("SELECT * FROM books where type & :type > 0 and type & ${BookType.local} = 0")
     fun getByTypeOnLine(type: Int): List<Book>
@@ -150,31 +326,14 @@ interface BookDao {
     @get:Query("SELECT * FROM books where type & ${BookType.text} > 0 ORDER BY durChapterTime DESC limit 1")
     val lastReadBook: Book?
 
-    @get:Query(
-        "SELECT * FROM books where type & ${BookType.notShelf} = 0 " +
-            "ORDER BY (durChapterIndex > 0 OR durChapterPos > 0) DESC, " +
-            "durChapterTime DESC limit 1"
-    )
-    val lastReadBookOnShelf: Book?
-
     @get:Query("SELECT bookUrl FROM books")
     val allBookUrls: List<String>
 
-    @Query("SELECT bookUrl FROM books WHERE bookUrl IN (:bookUrls)")
-    fun findExistingBookUrls(bookUrls: List<String>): List<String>
+    @get:Query("SELECT bookUrl, name, author, customTag, type, `group` FROM books")
+    val allTagInfos: List<BookTagInfo>
 
     @get:Query("SELECT COUNT(*) FROM books")
     val allBookCount: Int
-
-    @Query("SELECT COUNT(*) FROM books where type & ${BookType.notShelf} = 0")
-    fun flowShelfBookCount(): Flow<Int>
-
-    @get:Query(
-        "SELECT count(*) FROM books where " +
-            "(durChapterIndex > 0 OR durChapterPos > 0) " +
-            "and type & ${BookType.notShelf} = 0"
-    )
-    val readingCount: Int
 
     @get:Query("select min(`order`) from books")
     val minOrder: Int
@@ -195,55 +354,21 @@ interface BookDao {
     fun hasFile(fileName: String): Boolean
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(vararg book: Book)
-
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    fun insertIgnore(book: Book): Long
+    fun insertRaw(vararg book: Book)
 
     @Update
-    fun update(vararg book: Book)
-
-    @Query("select customCoverUrl from books where bookUrl = :bookUrl")
-    fun getCustomCoverUrl(bookUrl: String): String?
+    fun updateRaw(vararg book: Book)
 
     @Transaction
-    fun updatePreservingCustomCoverUrl(vararg books: Book) {
-        books.forEach { book ->
-            update(book.copy(customCoverUrl = getCustomCoverUrl(book.bookUrl)))
-        }
-    }
-
-    @Query(
-        """update books set customCoverUrl = :customCoverUrl
-        where bookUrl = :bookUrl and customCoverUrl is :expectedCustomCoverUrl"""
-    )
-    fun updateCustomCoverUrlIfUnchanged(
-        bookUrl: String,
-        expectedCustomCoverUrl: String?,
-        customCoverUrl: String?,
-    ): Int
-
-    @Query("select readConfig from books where bookUrl = :bookUrl")
-    fun getReadConfigJson(bookUrl: String): String?
-
-    @Query("update books set readConfig = :readConfig where bookUrl = :bookUrl")
-    fun updateReadConfigJson(bookUrl: String, readConfig: String?)
-
-    @Transaction
-    fun updatePreservingReadConfig(book: Book) {
-        val readConfig = getReadConfigJson(book.bookUrl)
-        updatePreservingCustomCoverUrl(book)
-        updateReadConfigJson(book.bookUrl, readConfig)
+    fun insert(vararg book: Book) {
+        book.forEach { it.sanitizeForStorage() }
+        insertRaw(*book)
     }
 
     @Transaction
-    fun updateAudioPlayMode(bookUrl: String, playMode: Int) {
-        updateReadConfigJson(bookUrl, getReadConfigJson(bookUrl).withAudioPlayMode(playMode))
-    }
-
-    @Transaction
-    fun updateAudioPlaySpeed(bookUrl: String, playSpeed: Float) {
-        updateReadConfigJson(bookUrl, getReadConfigJson(bookUrl).withAudioPlaySpeed(playSpeed))
+    fun update(vararg book: Book) {
+        book.forEach { it.sanitizeForStorage() }
+        updateRaw(*book)
     }
 
     @Delete
@@ -251,20 +376,36 @@ interface BookDao {
 
     @Transaction
     fun replace(oldBook: Book, newBook: Book) {
-        val customCoverUrl = if (has(newBook.bookUrl)) {
-            getCustomCoverUrl(newBook.bookUrl)
-        } else {
-            getCustomCoverUrl(oldBook.bookUrl)
-        }
+        newBook.sanitizeForStorage()
         delete(oldBook)
-        insert(newBook.copy(customCoverUrl = customCoverUrl))
+        insertRaw(newBook)
     }
 
     @Query("update books set durChapterPos = :pos where bookUrl = :bookUrl")
     fun upProgress(bookUrl: String, pos: Int)
 
-    @Query("update books set type = :type, `order` = :order where bookUrl = :bookUrl")
-    fun updateShelfState(bookUrl: String, type: Int, order: Int)
+    @Query(
+        """
+        update books set
+        lastCheckCount = :lastCheckCount,
+        durChapterTitle = :durChapterTitle,
+        durChapterIndex = :durChapterIndex,
+        durChapterPos = :durChapterPos,
+        durChapterTime = :durChapterTime
+        where bookUrl = :bookUrl
+        """
+    )
+    fun updateReadProgress(
+        bookUrl: String,
+        lastCheckCount: Int,
+        durChapterTitle: String?,
+        durChapterIndex: Int,
+        durChapterPos: Int,
+        durChapterTime: Long
+    )
+
+    @Query("update books set customTag = :customTag where bookUrl = :bookUrl")
+    fun updateCustomTag(bookUrl: String, customTag: String?)
 
     @Query("update books set `group` = :newGroupId where `group` = :oldGroupId")
     fun upGroup(oldGroupId: Long, newGroupId: Long)
@@ -276,18 +417,166 @@ interface BookDao {
     fun deleteNotShelfBook()
 }
 
-internal fun String?.withAudioPlayMode(playMode: Int): String {
-    return withAudioPlayPreference("playMode", playMode)
-}
+data class BookShelfIdentity(
+    val bookUrl: String,
+    val name: String,
+    val author: String,
+    val isNotShelf: Boolean
+)
 
-internal fun String?.withAudioPlaySpeed(playSpeed: Float): String {
-    return withAudioPlayPreference("playSpeed", playSpeed)
-}
+data class BookTagInfo(
+    val bookUrl: String,
+    val name: String,
+    val author: String,
+    val customTag: String?,
+    val type: Int,
+    val group: Long
+)
 
-private fun String?.withAudioPlayPreference(key: String, value: Number): String {
-    val readConfig = GSON.fromJsonObject<JsonObject>(this).getOrNull() ?: JsonObject().apply {
-        addProperty("useGlobalAudioSkip", true)
+@TypeConverters(Book.Converters::class)
+data class BookUpdateInfo(
+    val bookUrl: String,
+    val origin: String,
+    val type: Int,
+    val totalChapterNum: Int,
+    val durChapterIndex: Int,
+    val readConfig: Book.ReadConfig?
+) {
+    val isLocal: Boolean
+        get() {
+            if (type == 0) {
+                return origin == BookType.localTag || origin.startsWith(BookType.webDavTag)
+            }
+            return type and BookType.local > 0
+        }
+
+    fun getUnreadChapterNum(): Int {
+        val config = readConfig ?: return max(totalChapterNum - durChapterIndex - 1, 0)
+        if (!config.readSimulating) {
+            return max(totalChapterNum - durChapterIndex - 1, 0)
+        }
+        val startDate = config.startDate ?: return max(totalChapterNum - durChapterIndex - 1, 0)
+        val daysPassed = ChronoUnit.DAYS.between(startDate, LocalDate.now()).toInt() + 1
+        val chaptersToUnlock =
+            max(0, (config.startChapter ?: 0) + (daysPassed * config.dailyChapters))
+        return max(min(totalChapterNum, chaptersToUnlock) - durChapterIndex - 1, 0)
     }
-    readConfig.addProperty(key, value)
-    return GSON.toJson(readConfig)
+}
+
+@TypeConverters(Book.Converters::class)
+data class BookShelfDisplay(
+    val bookUrl: String,
+    val origin: String,
+    val originName: String,
+    val name: String,
+    val author: String,
+    val intro: String?,
+    val customIntro: String?,
+    val customTag: String?,
+    val coverUrl: String?,
+    val customCoverUrl: String?,
+    val type: Int,
+    val group: Long,
+    val latestChapterTitle: String?,
+    val latestChapterTime: Long,
+    val lastCheckCount: Int,
+    val totalChapterNum: Int,
+    val durChapterTitle: String?,
+    val durChapterIndex: Int,
+    val durChapterTime: Long,
+    val canUpdate: Boolean,
+    val order: Int,
+    val readConfig: Book.ReadConfig?
+) {
+    val isLocal: Boolean
+        get() {
+            if (type == 0) {
+                return origin == BookType.localTag || origin.startsWith(BookType.webDavTag)
+            }
+            return type and BookType.local > 0
+        }
+
+    val isAudio: Boolean
+        get() = type and BookType.audio > 0
+
+    val isVideo: Boolean
+        get() = type and BookType.video > 0
+
+    val isImage: Boolean
+        get() = type and BookType.image > 0
+
+    fun getDisplayCover(): String? {
+        return if (customCoverUrl.isNullOrEmpty()) coverUrl else customCoverUrl
+    }
+
+    fun getDisplayIntro(): String? {
+        return if (customIntro.isNullOrEmpty()) intro else customIntro
+    }
+
+    fun getUnreadChapterNum(): Int {
+        return max(simulatedTotalChapterNum() - durChapterIndex - 1, 0)
+    }
+
+    private fun simulatedTotalChapterNum(): Int {
+        val config = readConfig ?: return totalChapterNum
+        if (!config.readSimulating) {
+            return totalChapterNum
+        }
+        val startDate = config.startDate ?: return totalChapterNum
+        val daysPassed = ChronoUnit.DAYS.between(startDate, LocalDate.now()).toInt() + 1
+        val chaptersToUnlock =
+            max(0, (config.startChapter ?: 0) + (daysPassed * config.dailyChapters))
+        return min(totalChapterNum, chaptersToUnlock)
+    }
+
+    fun toMinimalBook(): Book {
+        return Book(
+            bookUrl = bookUrl,
+            origin = origin,
+            originName = originName,
+            name = name,
+            author = author,
+            customTag = customTag,
+            coverUrl = coverUrl,
+            customCoverUrl = customCoverUrl,
+            type = type,
+            group = group,
+            latestChapterTitle = latestChapterTitle,
+            latestChapterTime = latestChapterTime,
+            lastCheckCount = lastCheckCount,
+            totalChapterNum = totalChapterNum,
+            durChapterTitle = durChapterTitle,
+            durChapterIndex = durChapterIndex,
+            durChapterTime = durChapterTime,
+            canUpdate = canUpdate,
+            order = order,
+            readConfig = readConfig
+        )
+    }
+}
+
+data class BookDisplayInfo(
+    val bookUrl: String,
+    val name: String,
+    val author: String,
+    val origin: String,
+    val originName: String,
+    val coverUrl: String?,
+    val customCoverUrl: String?,
+    val durChapterTime: Long,
+    val type: Int
+) {
+    fun toBook(): Book {
+        return Book(
+            bookUrl = bookUrl,
+            name = name,
+            author = author,
+            origin = origin,
+            originName = originName,
+            coverUrl = coverUrl,
+            customCoverUrl = customCoverUrl,
+            durChapterTime = durChapterTime,
+            type = type
+        )
+    }
 }

@@ -73,11 +73,10 @@ val Context.accentColor: Int
     get() = ThemeStore.accentColor(this)
 
 val Context.backgroundColor: Int
-    get() = if (!AppConfig.isEInkMode && ThemeConfig.hasUsableBgImage(this)) {
-        Color.TRANSPARENT
-    } else {
-        ThemeStore.backgroundColor(this)
-    }
+    get() = ThemeStore.backgroundColor(this)
+
+val Context.popupBackground: Drawable
+    get() = filletBackground
 
 val Context.bottomBackground: Int
     get() = ThemeStore.bottomBackground(this)
