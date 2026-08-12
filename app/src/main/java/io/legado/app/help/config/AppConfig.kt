@@ -1053,6 +1053,14 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefString(ThemeRuntimeKeys.uiFontColor(isNightTheme)).orEmpty()
         set(value) = appCtx.putPrefString(ThemeRuntimeKeys.uiFontColor(isNightTheme), value)
 
+    var uiFontPath: String
+        get() = appCtx.getPrefString(ThemeRuntimeKeys.uiFontPath(isNightTheme)).orEmpty()
+        set(value) = appCtx.putPrefString(ThemeRuntimeKeys.uiFontPath(isNightTheme), value)
+
+    var titleFontPath: String
+        get() = appCtx.getPrefString(ThemeRuntimeKeys.titleFontPath(isNightTheme)).orEmpty()
+        set(value) = appCtx.putPrefString(ThemeRuntimeKeys.titleFontPath(isNightTheme), value)
+
     var titleFontColor: String
         get() = appCtx.getPrefString(ThemeRuntimeKeys.titleFontColor(isNightTheme)).orEmpty()
         set(value) = appCtx.putPrefString(ThemeRuntimeKeys.titleFontColor(isNightTheme), value)
@@ -1064,6 +1072,36 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var dialogAlpha: Int
         get() = appCtx.getPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), 100).coerceIn(0, 100)
         set(value) = appCtx.putPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), value.coerceIn(0, 100))
+
+    var uiCornerScale: Float
+        get() = appCtx.getPrefString(ThemeRuntimeKeys.uiCornerScale(isNightTheme), "1")
+            ?.toFloatOrNull()?.coerceIn(0f, 3f) ?: 1f
+        set(value) = appCtx.putPrefString(
+            ThemeRuntimeKeys.uiCornerScale(isNightTheme),
+            value.coerceIn(0f, 3f).toString()
+        )
+
+    var uiLayoutAlpha: Int
+        get() = appCtx.getPrefInt(ThemeRuntimeKeys.uiLayoutAlpha(isNightTheme), 100).coerceIn(0, 100)
+        set(value) = appCtx.putPrefInt(ThemeRuntimeKeys.uiLayoutAlpha(isNightTheme), value.coerceIn(0, 100))
+
+    val uiCornerSearchFollow: Boolean
+        get() = appCtx.getPrefBoolean(ThemeRuntimeKeys.uiCornerSearchFollow(isNightTheme), false)
+
+    val uiCornerReplyFollow: Boolean
+        get() = appCtx.getPrefBoolean(ThemeRuntimeKeys.uiCornerReplyFollow(isNightTheme), false)
+
+    var bottomBarLayoutMode: String
+        get() = appCtx.getPrefString(PreferKey.bottomBarLayoutMode, "floating")
+            ?.takeIf { it == "floating" || it == "sidebar" || it == "standard" } ?: "floating"
+        set(value) = appCtx.putPrefString(
+            PreferKey.bottomBarLayoutMode,
+            value.takeIf { it == "floating" || it == "sidebar" || it == "standard" } ?: "floating"
+        )
+
+    var floatingBottomBarHideSearch: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.floatingBottomBarHideSearch, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.floatingBottomBarHideSearch, value)
 }
 
 internal fun normalizeJsSourceApiToken(value: String?): String? {

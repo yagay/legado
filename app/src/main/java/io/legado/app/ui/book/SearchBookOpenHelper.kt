@@ -7,7 +7,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.constant.SourceType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.SearchBook
-import io.legado.app.ui.book.info.BookInfoNavigator
+import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.video.VideoPlayerActivity
 
 object SearchBookOpenHelper {
@@ -19,7 +19,10 @@ object SearchBookOpenHelper {
             openVideo(context, book)
             return
         }
-        context.startActivity(BookInfoNavigator.intent(context, book).apply {
+        context.startActivity(Intent(context, BookInfoActivity::class.java).apply {
+            putExtra("name", book.name)
+            putExtra("author", book.author)
+            putExtra("bookUrl", book.bookUrl)
             putExtra("videoTitle", book.name)
         })
     }
