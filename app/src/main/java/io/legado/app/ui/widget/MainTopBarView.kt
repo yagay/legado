@@ -334,7 +334,7 @@ class MainTopBarView @JvmOverloads constructor(
                     setTextColor(if (isSelected) context.accentColor else context.primaryTextColor)
                     background = UiCorner.actionSelector(
                         Color.TRANSPARENT,
-                        TopBarConfig.withOpacity(context.accentColor, 0.16f),
+                        TopBarConfig.withOpacity(context.accentColor, 16),
                         UiCorner.actionRadius(context)
                     )
                     setPadding(12.dp, 0, 12.dp, 0)
