@@ -90,6 +90,7 @@ import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.lib.theme.UiCorner
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.explore.ExploreShowActivity
+import io.legado.app.ui.book.explore.ExploreShowAdapter
 import io.legado.app.ui.book.explore.ExploreShowBookCallback
 import io.legado.app.ui.book.explore.ExploreShowWaterfallAdapter
 import io.legado.app.ui.book.SearchBookOpenHelper
@@ -102,6 +103,7 @@ import io.legado.app.ui.video.VideoBookPreloader
 import io.legado.app.ui.widget.ModernActionPopup
 import io.legado.app.ui.widget.RoundedTagBarView
 import io.legado.app.ui.widget.SourceSelectDialog
+import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.ui.widget.compose.LegadoComposeTheme
 import io.legado.app.ui.widget.compose.showComposeActionListDialog
 import io.legado.app.ui.widget.compose.showComposeChoiceListDialog
@@ -174,6 +176,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val linearLayoutManager by lazy { LinearLayoutManager(context) }
     private var discoverBookAdapter: RecyclerAdapter<SearchBook, *>? = null
     private var discoverBookLayoutMode = 0
+    private val discoverListDivider by lazy { VerticalDivider(requireContext()) }
     private val searchView: SearchView? by lazy {
         binding.titleBar.findViewById<SearchView?>(R.id.search_view)
     }
@@ -1774,11 +1777,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val layoutMode = AppConfig.discoveryPageLayout
         composeDiscoverLayoutMode.intValue = layoutMode
         composeDiscoverListStyle.intValue = AppConfig.bookshelfListItemStyle
-        val useComposeList = layoutMode != 2
-        binding.composeDiscoverBooks.isVisible = useComposeList
-        binding.rvDiscoverBooks.isGone = useComposeList
-        applyDiscoverBookContainerMargins(useComposeList)
-        if (useComposeList) {
+        val useComposeGrid = layoutMode == 3
+        binding.composeDiscoverBooks.isVisible = useComposeGrid
+        binding.rvDiscoverBooks.isGone = useComposeGrid
+        applyDiscoverBookContainerMargins(layoutMode != 2)
+        if (useComposeGrid) {
+            binding.rvDiscoverBooks.removeItemDecoration(discoverListDivider)
             discoverBookLayoutMode = layoutMode
             discoverBookAdapter = null
             binding.rvDiscoverBooks.adapter = null
@@ -1786,10 +1790,28 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             return
         }
         if (!force && discoverBookLayoutMode == layoutMode && discoverBookAdapter != null) return
+        binding.rvDiscoverBooks.removeItemDecoration(discoverListDivider)
         discoverBookLayoutMode = layoutMode
-        binding.rvDiscoverBooks.layoutManager =
-            StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
-        discoverBookAdapter = ExploreShowWaterfallAdapter(requireContext(), this, 2).also { adapter ->
+        if (layoutMode == 1) {
+            binding.rvDiscoverBooks.layoutManager = LinearLayoutManager(requireContext())
+            binding.rvDiscoverBooks.addItemDecoration(discoverListDivider)
+            discoverBookAdapter = ExploreShowAdapter(
+                requireContext(),
+                object : ExploreShowAdapter.CallBack {
+                    override fun isInBookshelf(book: SearchBook): Boolean =
+                        this@ExploreFragment.isInBookshelf(book)
+
+                    override fun showBookInfo(book: SearchBook) {
+                        this@ExploreFragment.showBookInfo(book)
+                    }
+                }
+            )
+        } else {
+            binding.rvDiscoverBooks.layoutManager =
+                StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
+            discoverBookAdapter = ExploreShowWaterfallAdapter(requireContext(), this, 2)
+        }
+        discoverBookAdapter?.also { adapter ->
             binding.rvDiscoverBooks.adapter = adapter
             if (discoverBooks.isNotEmpty()) {
                 adapter.setItems(discoverBooks.toList())
