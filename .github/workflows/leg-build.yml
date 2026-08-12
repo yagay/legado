@@ -23,5 +23,12 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v6.3.0
-      - name: Compile and test
-        run: ./gradlew compileAppDebugKotlin --stacktrace
+      - name: Build debug APK
+        run: ./gradlew assembleAppDebug --stacktrace
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legado-leg-debug
+          path: app/build/outputs/apk/app/debug/*.apk
+          if-no-files-found: error
