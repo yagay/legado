@@ -929,8 +929,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 WebBook.exploreBookAwait(
                     source,
                     tagUrl,
-                    page,
-                    WebViewPool.Scope.DISCOVERY
+                    page
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -3326,7 +3325,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                         callback = object : SourceLoginJsExtensions.Callback {
                             override fun upUiData(data: Map<String, Any?>?) = Unit
                             override fun reUiView(deltaUp: Boolean) = Unit
-                            override fun showBrowser(
+                            fun showBrowser(
                                 url: String,
                                 html: String?,
                                 preloadJs: String?,
@@ -3335,7 +3334,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                                 return false
                             }
 
-                            override fun open(
+                            fun open(
                                 name: String,
                                 url: String?,
                                 title: String?,
@@ -3477,8 +3476,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     WebBook.exploreBookAwait(
                         source,
                         url,
-                        pageToLoad,
-                        WebViewPool.Scope.DISCOVERY
+                        pageToLoad
                     )
                 }
                 if (!isAdded || requestVersion != discoverRequestVersion || url != discoverCurrentUrl) {

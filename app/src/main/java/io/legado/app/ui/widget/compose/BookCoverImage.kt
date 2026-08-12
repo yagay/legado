@@ -254,11 +254,6 @@ fun BookCoverImage(
             }
             val builder = when {
                 thumbFile != null -> ImageLoader.loadBitmap(context, thumbFile.absolutePath)
-                fragment != null && lifecycle != null -> runCatching {
-                    ImageLoader.loadBitmap(fragment, lifecycle, path)
-                }.getOrElse {
-                    ImageLoader.loadBitmap(context, path)
-                }
                 else -> ImageLoader.loadBitmap(context, path)
             }
             builder

@@ -81,8 +81,7 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
             viewModelScope,
             source,
             url,
-            page,
-            webViewPoolScope = WebViewPool.Scope.DISCOVERY
+            page
         )
             .timeout(if (BuildConfig.DEBUG) 0L else 60000L)
             .onSuccess(IO) { searchBooks ->
@@ -110,8 +109,7 @@ class ExploreShowViewModel(application: Application) : BaseViewModel(application
             viewModelScope,
             source,
             url,
-            page,
-            webViewPoolScope = WebViewPool.Scope.DISCOVERY
+            page
         )
             .timeout(if (BuildConfig.DEBUG) 0L else 60000L)
             .onSuccess(IO) { searchBooks ->
