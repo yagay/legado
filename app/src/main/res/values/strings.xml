@@ -1706,4 +1706,7 @@
     <string name="discovery_suite_default_rank_title">Selected rankings</string>
     <string name="theme_day">Day theme</string>
     <string name="theme_night">Night theme</string>
+    <string name="theme_manage_title">Theme Manager</string>
+    <string name="theme_add">Add theme</string>
+    <string name="theme_package_summary_default">Theme packages are saved separately and can sync to the WebDAV themes directory.</string>
 </resources>

@@ -1595,4 +1595,7 @@
     <string name="discovery_suite_default_rank_title">榜单精选</string>
     <string name="theme_day">日间主题</string>
     <string name="theme_night">夜间主题</string>
+    <string name="theme_manage_title">界面管理</string>
+    <string name="theme_add">添加主题</string>
+    <string name="theme_package_summary_default">主题包独立保存，可同步到 WebDAV themes 目录。</string>
 </resources>
