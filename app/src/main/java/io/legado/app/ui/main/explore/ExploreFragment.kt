@@ -244,6 +244,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private var discoveryModeLoaded = false
     private var modernTopOverlaySpace = -1
     private var discoverDefaultFiltersAppliedKey: String? = null
+    private var discoverClassificationMode = DiscoverClassificationMode.FLAT
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
@@ -2871,10 +2872,16 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             source.exploreKinds()
         }
         discoverKindTree = kinds
-        if (usingModernDiscovery && kinds.hasDiscoverChildren()) {
+        discoverClassificationMode = detectDiscoverClassificationMode(kinds)
+        if (usingModernDiscovery && discoverClassificationMode == DiscoverClassificationMode.TREE) {
+            val rootControls = buildDiscoverTagItems(
+                source,
+                kinds.filter { it.children.isNullOrEmpty() && it.type != ExploreKind.Type.url }
+            )
             discoverAllTagItems.clear()
             discoverTagItems.clear()
             discoverSelectItems.clear()
+            discoverSelectItems.addAll(rootControls.filter { it.role == DiscoverTagItem.Role.GlobalSelect })
             discoverMajorGroups.clear()
             selectedDiscoverMajorGroup = null
             renderDiscoverTags(emptyList(), -1)
@@ -3281,7 +3288,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             binding.topBar.setDiscoveryFilterRows(emptyList()) { _, _ -> }
             return
         }
-        if (discoverKindTree.hasDiscoverChildren()) {
+        if (discoverClassificationMode == DiscoverClassificationMode.TREE) {
             renderModernDiscoveryTree(loadSelectedUrl = false)
             return
         }
@@ -3392,7 +3399,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             }
             if (levelItems.isEmpty()) break
 
-            val visibleItems = levelItems.filter { cleanDiscoverTitle(it.title).isNotBlank() }
+            val visibleItems = levelItems.filter {
+                cleanDiscoverTitle(it.title).isNotBlank() &&
+                    (!it.children.isNullOrEmpty() || !it.discoverTargetUrl().isNullOrBlank())
+            }
             if (visibleItems.isEmpty()) break
             val selectedTitle = discoverTreeSelections[level]
                 ?.takeIf { saved -> visibleItems.any { it.title == saved } }
@@ -3414,6 +3424,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                                 .filter { it > rowLevel }
                                 .toList()
                                 .forEach(discoverTreeSelections::remove)
+                            persistDiscoverTreeSelections()
                             renderModernDiscoveryTree(loadSelectedUrl = true)
                         }
                     }
@@ -3425,6 +3436,25 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             inheritedTitle = selected.title
             levelItems = selected.children.orEmpty()
             level++
+        }
+
+        discoverSelectItems.forEach { item ->
+            val options = item.kind.chars?.filterNotNull().orEmpty()
+            if (options.isNotEmpty()) {
+                val current = currentDiscoverSelectValue(item)
+                actions += TreeRowAction(
+                    row = io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                        title = item.text,
+                        options = options,
+                        selectedIndex = options.indexOf(current)
+                    ),
+                    click = { optionIndex ->
+                        options.getOrNull(optionIndex)?.let { value ->
+                            applyDiscoverSelectValue(item, value)
+                        }
+                    }
+                )
+            }
         }
 
         binding.topBar.setDiscoveryFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
@@ -3444,8 +3474,26 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun restoreDiscoverTreeSelections(preferredUrl: String?) {
         discoverTreeSelections.clear()
+        val saved = AppConfig.modernDiscoveryTreeSelections(selectedDiscoverSource?.bookSourceUrl)
+        saved.forEachIndexed { level, title -> discoverTreeSelections[level] = title }
         if (preferredUrl.isNullOrBlank()) return
-        restoreDiscoverTreeSelectionsAtLevel(discoverKindTree, preferredUrl, 0)
+        val restoredFromUrl = mutableMapOf<Int, String>()
+        val oldSelections = discoverTreeSelections.toMap()
+        discoverTreeSelections.clear()
+        if (restoreDiscoverTreeSelectionsAtLevel(discoverKindTree, preferredUrl, 0)) {
+            restoredFromUrl.putAll(discoverTreeSelections)
+        }
+        discoverTreeSelections.clear()
+        discoverTreeSelections.putAll(if (restoredFromUrl.isNotEmpty()) restoredFromUrl else oldSelections)
+        persistDiscoverTreeSelections()
+    }
+
+    private fun persistDiscoverTreeSelections() {
+        val selections = discoverTreeSelections.toSortedMap().values.toList()
+        AppConfig.rememberModernDiscoveryTreeSelections(
+            selectedDiscoverSource?.bookSourceUrl,
+            selections
+        )
     }
 
     private fun restoreDiscoverTreeSelectionsAtLevel(
@@ -3527,6 +3575,14 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun countDiscoverKinds(kinds: List<ExploreKind>): Int {
         return kinds.sumOf { 1 + countDiscoverKinds(it.children.orEmpty()) }
+    }
+
+    private fun detectDiscoverClassificationMode(kinds: List<ExploreKind>): DiscoverClassificationMode {
+        if (kinds.hasDiscoverChildren()) return DiscoverClassificationMode.TREE
+        if (kinds.any { isDiscoverMajorGroupKind(it) || isDiscoverDecorativeGroupKind(it) }) {
+            return DiscoverClassificationMode.SECTION
+        }
+        return DiscoverClassificationMode.FLAT
     }
 
     private fun applyDiscoverSelectValue(item: DiscoverTagItem, value: String) {
@@ -4136,10 +4192,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private companion object {
         private val DISCOVER_STATUS_TITLES = setOf(
-            "全部", "完结", "连载", "完本", "在更", "已完成", "连载中", "Finished", "Loading"
+            "全部", "完结", "连载", "完本", "在更", "已完成", "连载中", "已完本", "更新中",
+            "暂停更新", "已完结", "Finished", "Loading"
         )
         private val DISCOVER_RANK_TITLES = setOf(
-            "推荐", "评分", "热门", "周榜", "月榜", "总榜", "日榜", "本周", "本月", "本日"
+            "推荐", "评分", "热门", "周榜", "月榜", "总榜", "日榜", "本周", "本月", "本日",
+            "畅销", "点击", "新书", "收藏", "人气", "热度"
         )
         private val DISCOVER_STANDARD_SELECTOR_TITLES = setOf(
             "分类", "频道", "状态", "榜单", "标签", "类型"
@@ -4170,6 +4228,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         private const val SUITE_VISIBLE_COVER_PRELOAD_TIMEOUT_MS = 1800L
     }
 
+}
+
+private enum class DiscoverClassificationMode {
+    FLAT,
+    SECTION,
+    TREE
 }
 
 private data class SuiteRandomDeck(
