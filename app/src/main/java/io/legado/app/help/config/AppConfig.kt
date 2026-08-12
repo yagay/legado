@@ -1013,6 +1013,26 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.getPrefString(PreferKey.modernDiscoveryTagUrls)
         ).getOrDefault(emptyMap()).filterKeys { it.isNotBlank() }.filterValues { it.isNotBlank() }
 
+    fun modernDiscoveryTreeSelections(sourceUrl: String?): List<String> {
+        val key = sourceUrl?.takeIf { it.isNotBlank() } ?: return emptyList()
+        return modernDiscoveryTreeSelectionMap()[key].orEmpty().filter { it.isNotBlank() }
+    }
+
+    fun rememberModernDiscoveryTreeSelections(sourceUrl: String?, selections: List<String>) {
+        val key = sourceUrl?.takeIf { it.isNotBlank() } ?: return
+        val values = modernDiscoveryTreeSelectionMap().toMutableMap()
+        selections.filter { it.isNotBlank() }.takeIf { it.isNotEmpty() }
+            ?.let { values[key] = it }
+            ?: values.remove(key)
+        if (values.isEmpty()) appCtx.removePref(PreferKey.modernDiscoveryTreeSelections)
+        else appCtx.putPrefString(PreferKey.modernDiscoveryTreeSelections, GSON.toJson(values))
+    }
+
+    private fun modernDiscoveryTreeSelectionMap(): Map<String, List<String>> =
+        GSON.fromJsonObject<Map<String, List<String>>>(
+            appCtx.getPrefString(PreferKey.modernDiscoveryTreeSelections)
+        ).getOrDefault(emptyMap()).filterKeys { it.isNotBlank() }
+
     var bookshelfListItemStyle: Int
         get() = appCtx.getPrefInt(PreferKey.bookshelfListItemStyle, 0).coerceIn(0, 1)
         set(value) = appCtx.putPrefInt(PreferKey.bookshelfListItemStyle, value.coerceIn(0, 1))
