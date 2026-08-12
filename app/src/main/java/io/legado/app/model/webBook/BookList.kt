@@ -22,6 +22,7 @@ import io.legado.app.utils.HtmlFormatter
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.StringUtils.wordCountFormat
 import io.legado.app.utils.fromJsonArray
+import com.google.gson.JsonArray
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import splitties.init.appCtx
@@ -95,7 +96,15 @@ object BookList {
             ruleList = ruleList.substring(1)
         }
         Debug.log(bookSource.bookSourceUrl, "┌获取书籍列表")
-        collections = analyzeRule.getElements(ruleList)
+        collections = try {
+            analyzeRule.getElements(ruleList)
+        } catch (error: Exception) {
+            extractExploreContentArray(body, isSearch)?.let { contentArray ->
+                Debug.log(bookSource.bookSourceUrl, "≡发现响应为数组包装，使用首项 content 继续解析")
+                analyzeRule.setContent(contentArray.toString()).setBaseUrl(baseUrl)
+                analyzeRule.getElements("$[*]")
+            } ?: throw error
+        }
         currentCoroutineContext().ensureActive()
         if (collections.isEmpty() && bookSource.bookUrlPattern.isNullOrEmpty()) {
             Debug.log(bookSource.bookSourceUrl, "└列表为空,按详情页解析")
@@ -303,6 +312,19 @@ object BookList {
         GSON.fromJsonArray<ExploreKind>(json).getOrNull()?.let {
             Debug.log("≡发现地址规则 JSON 格式不规范，请改为规范格式")
         }
+    }
+
+    /**
+     * 兼容少量旧发现接口返回 [{"content":[...]}]，而书源组合规则先按 $.data
+     * 读取对象导致失败的情况。仅在非搜索请求且结构严格匹配时启用。
+     */
+    private fun extractExploreContentArray(body: String, isSearch: Boolean): JsonArray? {
+        if (isSearch) return null
+        val root = runCatching { GSON.fromJson(body, JsonArray::class.java) }.getOrNull()
+            ?: return null
+        if (root.size() != 1 || !root.first().isJsonObject) return null
+        val content = root.first().asJsonObject.get("content") ?: return null
+        return content.takeIf { it.isJsonArray }?.asJsonArray
     }
 
 }
