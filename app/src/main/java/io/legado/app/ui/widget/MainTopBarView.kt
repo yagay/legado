@@ -31,6 +31,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.TopBarConfig
 import io.legado.app.lib.theme.TopBarSearchStyle
 import io.legado.app.lib.theme.UiCorner
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.applyUiTitleTypeface
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryTextColor
