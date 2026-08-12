@@ -64,7 +64,8 @@ android {
     }
     defaultConfig {
         applicationId "com.legado.app"
-        minSdk 23
+        // HtmlUnit 5.3 uses MethodHandle.invoke, which D8 supports from Android O.
+        minSdk 26
         targetSdk 36
         versionCode = versionCodeValue
         versionName version
