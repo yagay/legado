@@ -247,6 +247,7 @@ object PreferKey {
     const val discoveryPageLayout = "discoveryPageLayout"
     const val modernDiscoverySourceUrl = "modernDiscoverySourceUrl"
     const val modernDiscoveryTagUrls = "modernDiscoveryTagUrls"
+    const val modernDiscoveryTreeSelections = "modernDiscoveryTreeSelections"
     const val bookshelfListItemStyle = "bookshelfListItemStyle"
     const val bookshelfHiddenTags = "bookshelfHiddenTags"
     const val bookshelfGroupTags = "bookshelfGroupTags"
