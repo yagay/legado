@@ -26,32 +26,32 @@ object AppCloudStorage {
     suspend fun uploadTopBarPackage(
         isNight: Boolean, dirName: String, file: File,
         containerId: String? = null, scope: String? = null
-    ) = unsupported()
+    ): Nothing = unsupported()
 
     suspend fun downloadTopBarPackage(
         isNight: Boolean, dirName: String, file: File,
         containerId: String? = null, scope: String? = null
-    ) = unsupported()
+    ): Nothing = unsupported()
 
     suspend fun deleteTopBarPackage(
         isNight: Boolean, dirName: String,
         containerId: String? = null, scope: String? = null
-    ) = unsupported()
+    ): Nothing = unsupported()
 
     suspend fun uploadCoverCollectionPackage(
         isNight: Boolean, dirName: String, file: File,
         containerId: String? = null, scope: String? = null
-    ) = unsupported()
+    ): Nothing = unsupported()
 
     suspend fun downloadCoverCollectionPackage(
         isNight: Boolean, dirName: String, file: File,
         containerId: String? = null, scope: String? = null
-    ) = unsupported()
+    ): Nothing = unsupported()
 
     suspend fun deleteCoverCollectionPackage(
         isNight: Boolean, dirName: String,
         containerId: String? = null, scope: String? = null
-    ) = unsupported()
+    ): Nothing = unsupported()
 
     private fun unsupported(): Nothing =
         throw UnsupportedOperationException("Remote discovery asset packages are unavailable")
