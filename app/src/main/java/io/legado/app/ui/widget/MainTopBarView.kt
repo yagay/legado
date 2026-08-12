@@ -35,6 +35,7 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.applyUiTitleTypeface
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryTextColor
+import io.legado.app.lib.theme.secondaryTextColor
 import io.legado.app.lib.theme.titleTextColor
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.ui.widget.compose.ComposeThemeImageLayer
@@ -68,6 +69,16 @@ class MainTopBarView @JvmOverloads constructor(
     private val discoveryRows = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
     }
+    private val discoveryPath = TextView(context).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.START
+        textSize = 14f
+        typeface = context.uiTypeface()
+        setTextColor(context.secondaryTextColor)
+        setPadding(8.dp, 0, 8.dp, 0)
+        isVisible = false
+    }
     private val primaryFilterRow = LinearLayout(context)
     private val filterToggleButton = actionButton(R.drawable.ic_expand_more, R.string.screen)
     private val titleSpacer = Space(context)
@@ -98,6 +109,8 @@ class MainTopBarView @JvmOverloads constructor(
     private var selectsBarRequested = false
     private var tagsBarRequested = false
     private var filtersExpanded = false
+    private var discoveryFiltersCollapsed = false
+    private var hasDiscoveryRows = false
     private var searchEntryRequested = true
     private var onHeightChanged: (() -> Unit)? = null
     private var onFilterExpandedChanged: ((Boolean) -> Unit)? = null
@@ -159,6 +172,7 @@ class MainTopBarView @JvmOverloads constructor(
             topMargin = resources.getDimensionPixelSize(R.dimen.bookshelf_tag_bar_margin_top)
         })
         contentLayout.addView(discoveryRows, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        contentLayout.addView(discoveryPath, LayoutParams(LayoutParams.MATCH_PARENT, 38.dp))
         primaryBar.isVisible = false
         primaryFilterRow.isVisible = false
         filterToggleButton.isVisible = false
@@ -289,12 +303,30 @@ class MainTopBarView @JvmOverloads constructor(
         onOptionClick: (rowIndex: Int, optionIndex: Int) -> Unit
     ) {
         discoveryRows.removeAllViews()
-        discoveryRows.isVisible = rows.isNotEmpty()
+        hasDiscoveryRows = rows.isNotEmpty()
+        discoveryRows.isVisible = hasDiscoveryRows && !discoveryFiltersCollapsed
         selectsBar.isVisible = false
         tagsBar.isVisible = false
         rows.forEachIndexed { rowIndex, row ->
             discoveryRows.addView(buildDiscoveryFilterRow(rowIndex, row, onOptionClick))
         }
+        notifyHeightChangedAfterLayout()
+    }
+
+    /**
+     * 分类滚出屏幕后只保留当前路径，形成位于书籍列表上方的粘性标题。
+     */
+    fun setDiscoveryFiltersCollapsed(collapsed: Boolean) {
+        if (discoveryFiltersCollapsed == collapsed) return
+        discoveryFiltersCollapsed = collapsed
+        discoveryRows.isVisible = hasDiscoveryRows && !collapsed
+        notifyHeightChangedAfterLayout()
+    }
+
+    fun setDiscoveryPath(path: String?) {
+        val value = path?.trim().orEmpty()
+        discoveryPath.text = value
+        discoveryPath.isVisible = value.isNotEmpty()
         notifyHeightChangedAfterLayout()
     }
 
