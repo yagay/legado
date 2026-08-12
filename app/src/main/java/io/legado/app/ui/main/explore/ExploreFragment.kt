@@ -3252,7 +3252,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             binding.topBar.tagsBar.submitItems(emptyList(), -1)
             return
         }
-        binding.topBar.showTags(true)
+        // 现代发现页已经把频道、分类渲染为动态筛选行，隐藏旧版横向标签条，
+        // 避免在“频道”上方重复出现一排可滑动分类。列表布局仍保持上游行为。
+        binding.topBar.showTags(!usingModernDiscovery)
         selectedDiscoverTagIndex = selectedIndex.coerceIn(-1, items.lastIndex)
         selectedDiscoverUrlIndex = if (selectedDiscoverTagIndex in items.indices && !items[selectedDiscoverTagIndex].isButton) {
             selectedDiscoverTagIndex
@@ -3273,7 +3275,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             binding.topBar.selectsBar.submitItems(emptyList(), -1)
             return
         }
-        binding.topBar.showSelects(true)
+        // select 数据仍供现代动态筛选行使用，仅隐藏旧版横向选择条。
+        binding.topBar.showSelects(!usingModernDiscovery)
         binding.topBar.selectsBar.submitItems(
             items.map {
                 val value = currentDiscoverSelectValue(it)
