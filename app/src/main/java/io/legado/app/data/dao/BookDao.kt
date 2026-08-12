@@ -317,6 +317,9 @@ data class BookShelfDisplay(
     val isVideo: Boolean get() = type and BookType.video > 0
     val isImage: Boolean get() = type and BookType.image > 0
     fun getDisplayCover(): String? = customCoverUrl?.takeIf { it.isNotEmpty() } ?: coverUrl
+    fun getDisplayIntro(): String? = customIntro?.takeIf { it.isNotEmpty() } ?: intro
+    fun getUnreadChapterNum(): Int =
+        kotlin.math.max(totalChapterNum - durChapterIndex - 1, 0)
 }
 
 internal fun String?.withAudioPlayMode(playMode: Int): String {

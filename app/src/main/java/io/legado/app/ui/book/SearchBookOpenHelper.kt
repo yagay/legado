@@ -48,7 +48,7 @@ object SearchBookOpenHelper {
             if (target == VideoPlayerActivity::class.java && prepareInPlayer) {
                 putExtra("sourceKey", book.origin)
                 putExtra("sourceType", SourceType.book)
-                putExtra(VideoPlayerActivity.EXTRA_PREPARE_BOOK_INFO, true)
+                putExtra("extra_prepare_book_info", true)
             }
         })
     }
