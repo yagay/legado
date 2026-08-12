@@ -360,33 +360,22 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             R.id.menu_discovery_page_mode,
             Menu.NONE,
             R.string.switch_discovery_page_interface
-        ).setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+        ).apply {
+            setIcon(R.drawable.ic_swap_horiz)
+            setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+        }
         groupsMenu = menu.findItem(R.id.menu_group)?.subMenu
         upGroupsMenu()
     }
 
-    private fun showDiscoveryPageModeSelector() {
-        val values = listOf(
-            AppConfig.DISCOVERY_PAGE_MODE_LEGACY,
+    private fun toggleDiscoveryPageMode() {
+        AppConfig.discoveryPageMode = if (usingModernDiscovery) {
+            AppConfig.DISCOVERY_PAGE_MODE_LEGACY
+        } else {
             AppConfig.DISCOVERY_PAGE_MODE_MODERN
-        )
-        val labels = listOf(
-            getString(R.string.discovery_page_mode_legacy),
-            getString(R.string.discovery_page_mode_modern)
-        )
-        showComposeChoiceListDialog(
-            title = getString(R.string.discovery_page_interface),
-            labels = labels,
-            selectedIndex = values.indexOf(AppConfig.discoveryPageMode)
-        ) { index ->
-            values.getOrNull(index)?.let { mode ->
-                if (mode != AppConfig.discoveryPageMode) {
-                    AppConfig.discoveryPageMode = mode
-                    applyDiscoveryMode(loadData = true)
-                    activity?.invalidateOptionsMenu()
-                }
-            }
         }
+        applyDiscoveryMode(loadData = true)
+        activity?.invalidateOptionsMenu()
     }
 
     private fun applyDiscoveryMode(loadData: Boolean = true) {
@@ -2031,8 +2020,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             showDiscoverTagFilterMenu()
         }
         binding.topBar.moreButton.isVisible = true
+        binding.topBar.moreButton.setImageResource(R.drawable.ic_swap_horiz)
+        binding.topBar.moreButton.contentDescription = getString(R.string.switch_discovery_page_interface)
         binding.topBar.moreButton.setOnClickListener {
-            showDiscoveryPageModeSelector()
+            toggleDiscoveryPageMode()
         }
         updateDiscoverTagFilterButtonState()
         updateDiscoverSearchButtonState()
@@ -3987,7 +3978,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     override fun onCompatOptionsItemSelected(item: MenuItem) {
         super.onCompatOptionsItemSelected(item)
         if (item.itemId == R.id.menu_discovery_page_mode) {
-            showDiscoveryPageModeSelector()
+            toggleDiscoveryPageMode()
             return
         }
         if (usingModernDiscovery || usingSuiteDiscovery) return
