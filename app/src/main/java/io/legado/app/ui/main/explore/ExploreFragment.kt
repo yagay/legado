@@ -3382,7 +3382,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val actions = mutableListOf<TreeRowAction>()
         var levelItems = discoverKindTree
         var inheritedTitle: String? = null
-        var lastValidUrl: String? = null
+        var lastValidNode: ExploreKind? = null
         var level = 0
         var steps = 0
         val safetyLimit = (countDiscoverKinds(discoverKindTree) + 1).coerceAtLeast(16)
@@ -3432,7 +3432,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             )
 
             val selected = visibleItems.firstOrNull { it.title == selectedTitle } ?: break
-            selected.discoverTargetUrl()?.let { lastValidUrl = it }
+            selected.discoverTargetUrl()?.let { url ->
+                lastValidNode = selected.copy(url = url, action = null)
+            }
             inheritedTitle = selected.title
             levelItems = selected.children.orEmpty()
             level++
@@ -3460,16 +3462,21 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.topBar.setDiscoveryFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
             actions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
         }
-        if (loadSelectedUrl && !lastValidUrl.isNullOrBlank()) {
-            selectModernDiscoverTreeUrl(lastValidUrl)
+        if (loadSelectedUrl && lastValidNode != null) {
+            selectModernDiscoverTreeNode(lastValidNode!!)
         }
     }
 
-    private fun selectModernDiscoverTreeUrl(url: String) {
-        AppConfig.rememberModernDiscoveryTagUrl(selectedDiscoverSource?.bookSourceUrl, url)
-        if (discoverCurrentUrl == url && discoverBooks.isNotEmpty()) return
-        discoverCurrentUrl = url
-        loadDiscoverBooks(reset = true)
+    private fun selectModernDiscoverTreeNode(kind: ExploreKind) {
+        val url = kind.discoverTargetUrl()?.takeIf { it.isNotBlank() } ?: return
+        val item = DiscoverTagItem(
+            kind = kind.copy(url = url, action = null, type = ExploreKind.Type.url),
+            text = cleanDiscoverTitle(kind.title),
+            role = DiscoverTagItem.Role.UrlTag
+        )
+        // 树形筛选没有旧标签栏索引，但仍统一进入主项目标准 URL 标签选择链，
+        // 保证当前 URL、持久化、请求取消和书籍加载状态完全一致。
+        selectDiscoverTag(index = -1, item = item, selectTab = false)
     }
 
     private fun restoreDiscoverTreeSelections(preferredUrl: String?) {
