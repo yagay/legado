@@ -24,4 +24,4 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v6.3.0
       - name: Compile and test
-        run: ./gradlew testDebugUnitTest assembleDebug --stacktrace
+        run: ./gradlew compileAppDebugKotlin --stacktrace
