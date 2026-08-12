@@ -1,5 +1,6 @@
 package io.legado.app.model.webBook
 
+import com.google.gson.JsonArray
 import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
@@ -22,7 +23,6 @@ import io.legado.app.utils.HtmlFormatter
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.StringUtils.wordCountFormat
 import io.legado.app.utils.fromJsonArray
-import com.google.gson.JsonArray
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import splitties.init.appCtx
@@ -80,7 +80,7 @@ object BookList {
                 return bookList
             }
         }
-        val collections: List<Any>
+        var collections: List<Any>
         var reverse = false
         val bookListRule: BookListRule = when {
             isSearch -> bookSource.getSearchRule()
@@ -96,17 +96,31 @@ object BookList {
             ruleList = ruleList.substring(1)
         }
         Debug.log(bookSource.bookSourceUrl, "┌获取书籍列表")
+        var exploreContentArray: JsonArray? = null
         collections = try {
             analyzeRule.getElements(ruleList)
         } catch (error: Exception) {
             extractExploreContentArray(body, isSearch)?.let { contentArray ->
+                exploreContentArray = contentArray
                 Debug.log(bookSource.bookSourceUrl, "≡发现响应为数组包装，使用首项 content 继续解析")
                 analyzeRule.setContent(contentArray.toString()).setBaseUrl(baseUrl)
                 analyzeRule.getElements("$[*]")
             } ?: throw error
         }
+        if (collections.isEmpty()) {
+            extractExploreContentArray(body, isSearch)?.let { contentArray ->
+                exploreContentArray = contentArray
+                Debug.log(bookSource.bookSourceUrl, "≡发现规则返回空列表，使用首项 content 重新解析")
+                analyzeRule.setContent(contentArray.toString()).setBaseUrl(baseUrl)
+                collections = analyzeRule.getElements("$[*]")
+            }
+        }
         currentCoroutineContext().ensureActive()
-        if (collections.isEmpty() && bookSource.bookUrlPattern.isNullOrEmpty()) {
+        if (
+            collections.isEmpty() &&
+            exploreContentArray == null &&
+            bookSource.bookUrlPattern.isNullOrEmpty()
+        ) {
             Debug.log(bookSource.bookSourceUrl, "└列表为空,按详情页解析")
             getInfoItem(
                 bookSource, analyzeRule, analyzeUrl, body, baseUrl, ruleData.getVariable(),
