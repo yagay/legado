@@ -24,6 +24,8 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
+import com.google.android.flexbox.FlexWrap
+import com.google.android.flexbox.FlexboxLayout
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.TopBarConfig
@@ -62,6 +64,9 @@ class MainTopBarView @JvmOverloads constructor(
     val primaryBar = RoundedTagBarView(context)
     val selectsBar = RoundedTagBarView(context)
     val tagsBar = RoundedTagBarView(context)
+    private val discoveryRows = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+    }
     private val primaryFilterRow = LinearLayout(context)
     private val filterToggleButton = actionButton(R.drawable.ic_expand_more, R.string.screen)
     private val titleSpacer = Space(context)
@@ -152,6 +157,7 @@ class MainTopBarView @JvmOverloads constructor(
         contentLayout.addView(tagsBar, tagLayoutParams().apply {
             topMargin = resources.getDimensionPixelSize(R.dimen.bookshelf_tag_bar_margin_top)
         })
+        contentLayout.addView(discoveryRows, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         primaryBar.isVisible = false
         primaryFilterRow.isVisible = false
         filterToggleButton.isVisible = false
@@ -269,6 +275,90 @@ class MainTopBarView @JvmOverloads constructor(
         }
         filtersExpanded = expanded
         updateFilterBarsVisibility()
+    }
+
+    data class DiscoveryFilterRow(
+        val title: String,
+        val options: List<String>,
+        val selectedIndex: Int = -1
+    )
+
+    fun setDiscoveryFilterRows(
+        rows: List<DiscoveryFilterRow>,
+        onOptionClick: (rowIndex: Int, optionIndex: Int) -> Unit
+    ) {
+        discoveryRows.removeAllViews()
+        discoveryRows.isVisible = rows.isNotEmpty()
+        selectsBar.isVisible = false
+        tagsBar.isVisible = false
+        rows.forEachIndexed { rowIndex, row ->
+            discoveryRows.addView(buildDiscoveryFilterRow(rowIndex, row, onOptionClick))
+        }
+        notifyHeightChangedAfterLayout()
+    }
+
+    private fun buildDiscoveryFilterRow(
+        rowIndex: Int,
+        row: DiscoveryFilterRow,
+        onOptionClick: (Int, Int) -> Unit
+    ): View {
+        val line = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.TOP
+            setPadding(0, 2.dp, 0, 2.dp)
+        }
+        line.addView(TextView(context).apply {
+            text = row.title
+            setTextColor(context.primaryTextColor)
+            textSize = 15f
+            gravity = Gravity.CENTER_VERTICAL
+            typeface = context.uiTypeface()
+        }, LayoutParams(62.dp, 36.dp))
+        val flex = FlexboxLayout(context).apply {
+            flexWrap = FlexWrap.WRAP
+            clipChildren = false
+        }
+        val expandable = row.options.size > 5
+        var expanded = false
+        fun render() {
+            flex.removeAllViews()
+            val visible = if (expanded || !expandable) row.options.indices else 0 until 5
+            visible.forEach { optionIndex ->
+                flex.addView(TextView(context).apply {
+                    text = row.options[optionIndex]
+                    textSize = 14f
+                    gravity = Gravity.CENTER
+                    typeface = context.uiTypeface()
+                    isSelected = optionIndex == row.selectedIndex
+                    setTextColor(if (isSelected) context.accentColor else context.primaryTextColor)
+                    background = UiCorner.actionSelector(
+                        Color.TRANSPARENT,
+                        TopBarConfig.withOpacity(context.accentColor, 0.16f),
+                        UiCorner.actionRadius(context)
+                    )
+                    setPadding(12.dp, 0, 12.dp, 0)
+                    setOnClickListener { onOptionClick(rowIndex, optionIndex) }
+                }, FlexboxLayout.LayoutParams(LayoutParams.WRAP_CONTENT, 34.dp).apply {
+                    setMargins(0, 1.dp, 6.dp, 1.dp)
+                })
+            }
+            if (expandable) {
+                flex.addView(TextView(context).apply {
+                    text = if (expanded) "︿" else "﹀"
+                    textSize = 18f
+                    gravity = Gravity.CENTER
+                    setTextColor(context.accentColor)
+                    setOnClickListener {
+                        expanded = !expanded
+                        render()
+                        notifyHeightChangedAfterLayout()
+                    }
+                }, FlexboxLayout.LayoutParams(34.dp, 34.dp))
+            }
+        }
+        render()
+        line.addView(flex, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        return line
     }
 
     fun showSelects(show: Boolean) {

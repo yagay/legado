@@ -366,13 +366,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private fun showDiscoveryPageModeSelector() {
         val values = listOf(
             AppConfig.DISCOVERY_PAGE_MODE_LEGACY,
-            AppConfig.DISCOVERY_PAGE_MODE_MODERN,
-            AppConfig.DISCOVERY_PAGE_MODE_SUITE
+            AppConfig.DISCOVERY_PAGE_MODE_MODERN
         )
         val labels = listOf(
             getString(R.string.discovery_page_mode_legacy),
-            getString(R.string.discovery_page_mode_modern),
-            getString(R.string.discovery_page_mode_suite)
+            getString(R.string.discovery_page_mode_modern)
         )
         showComposeChoiceListDialog(
             title = getString(R.string.discovery_page_interface),
@@ -3179,6 +3177,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val targetIndex = targetIndexByUrl
             ?: tagItems.indexOfFirst { !it.isButton && !it.kind.url.isNullOrBlank() }
         renderDiscoverTags(tagItems, targetIndex)
+        renderModernDiscoveryFilterRows()
         applyDiscoverDefaultFilterExpansionOnce()
         if (targetIndex >= 0) {
             selectDiscoverTag(targetIndex, tagItems[targetIndex], selectTab = true)
@@ -3267,6 +3266,101 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         )
     }
 
+    private fun renderModernDiscoveryFilterRows() {
+        if (!usingModernDiscovery) {
+            binding.topBar.setDiscoveryFilterRows(emptyList()) { _, _ -> }
+            return
+        }
+        data class RowAction(
+            val row: io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow,
+            val click: (Int) -> Unit
+        )
+        val actions = mutableListOf<RowAction>()
+        discoverSelectItems.forEach { item ->
+            val options = item.kind.chars?.filterNotNull().orEmpty()
+            if (options.isNotEmpty()) {
+                val current = currentDiscoverSelectValue(item)
+                actions += RowAction(
+                    io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                        title = item.text,
+                        options = options,
+                        selectedIndex = options.indexOf(current)
+                    )
+                ) { optionIndex ->
+                    options.getOrNull(optionIndex)?.let { value ->
+                        applyDiscoverSelectValue(item, value)
+                    }
+                }
+            }
+        }
+        discoverMajorGroups.forEach { group ->
+            val items = discoverAllTagItems.filter {
+                it.group == group && !it.isButton && !it.kind.url.isNullOrBlank()
+            }
+            if (items.isNotEmpty()) {
+                actions += RowAction(
+                    io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                        title = group,
+                        options = items.map { it.text },
+                        selectedIndex = items.indexOfFirst { it.kind.url == discoverCurrentUrl }
+                    )
+                ) { optionIndex ->
+                    items.getOrNull(optionIndex)?.let { item ->
+                        selectedDiscoverMajorGroup = group
+                        applyDiscoverTagFilterAndSelect(
+                            preferredUrl = item.kind.url,
+                            restoreGroupForPreferredUrl = true
+                        )
+                    }
+                }
+            }
+        }
+        if (discoverMajorGroups.isEmpty()) {
+            val items = discoverTagItems.filter { !it.isButton && !it.kind.url.isNullOrBlank() }
+            if (items.isNotEmpty()) {
+                actions += RowAction(
+                    io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                        title = getString(R.string.discovery_category),
+                        options = items.map { it.text },
+                        selectedIndex = items.indexOfFirst { it.kind.url == discoverCurrentUrl }
+                    )
+                ) { optionIndex ->
+                    items.getOrNull(optionIndex)?.let { item ->
+                        val index = discoverTagItems.indexOf(item)
+                        selectDiscoverTag(index, item, selectTab = false)
+                        renderModernDiscoveryFilterRows()
+                    }
+                }
+            }
+        }
+        binding.topBar.setDiscoveryFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
+            actions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
+        }
+    }
+
+    private fun applyDiscoverSelectValue(item: DiscoverTagItem, value: String) {
+        val source = selectedDiscoverSource ?: return
+        val key = item.kind.title
+        if (key.isBlank()) return
+        val infoMap = getDiscoverInfoMap(source.bookSourceUrl)
+        infoMap[key] = value
+        viewLifecycleOwner.lifecycleScope.launch(IO) {
+            source.clearExploreKindsCache()
+            item.kind.action?.takeIf { it.isNotBlank() }?.let { action ->
+                val script = normalizeDiscoverActionScript(action)
+                runScriptWithContext {
+                    source.evalJS(script) {
+                        put("java", SourceLoginJsExtensions(activity as? AppCompatActivity, source))
+                        put("infoMap", infoMap)
+                    }
+                }
+            }
+            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                loadDiscoverKindsAndDefault()
+            }
+        }
+    }
+
     private fun applyDiscoverDefaultFilterExpansionOnce() {
         if (!usingModernDiscovery || !binding.topBar.isRegularStyle()) return
         val config = TopBarConfig.currentConfig(requireContext(), AppConfig.isNightTheme)
@@ -3297,25 +3391,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         if (key.isBlank()) return
         val options = item.kind.chars?.filterNotNull() ?: emptyList()
         if (options.isEmpty()) return
-        val infoMap = getDiscoverInfoMap(source.bookSourceUrl)
         context?.selector(item.text, options) { _, value, _ ->
-            infoMap[key] = value
-            viewLifecycleOwner.lifecycleScope.launch(IO) {
-                source.clearExploreKindsCache()
-                val action = item.kind.action?.takeIf { it.isNotBlank() }
-                if (!action.isNullOrBlank()) {
-                    val script = normalizeDiscoverActionScript(action)
-                    runScriptWithContext {
-                        source.evalJS(script) {
-                            put("java", SourceLoginJsExtensions(activity as? AppCompatActivity, source))
-                            put("infoMap", infoMap)
-                        }
-                    }
-                }
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    loadDiscoverKindsAndDefault()
-                }
-            }
+            applyDiscoverSelectValue(item, value)
         }
     }
 

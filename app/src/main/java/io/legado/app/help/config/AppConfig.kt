@@ -969,13 +969,13 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     var discoveryPageMode: String
         get() = when (val value = appCtx.getPrefString(PreferKey.discoveryPageMode)) {
-            DISCOVERY_PAGE_MODE_LEGACY, DISCOVERY_PAGE_MODE_MODERN, DISCOVERY_PAGE_MODE_SUITE -> value
+            DISCOVERY_PAGE_MODE_LEGACY, DISCOVERY_PAGE_MODE_MODERN -> value
+            DISCOVERY_PAGE_MODE_SUITE -> DISCOVERY_PAGE_MODE_MODERN
             else -> DISCOVERY_PAGE_MODE_LEGACY
         }
         set(value) {
             val normalized = value.takeIf {
-                it == DISCOVERY_PAGE_MODE_LEGACY || it == DISCOVERY_PAGE_MODE_MODERN ||
-                    it == DISCOVERY_PAGE_MODE_SUITE
+                it == DISCOVERY_PAGE_MODE_LEGACY || it == DISCOVERY_PAGE_MODE_MODERN
             } ?: DISCOVERY_PAGE_MODE_LEGACY
             appCtx.putPrefString(PreferKey.discoveryPageMode, normalized)
             appCtx.putPrefBoolean(PreferKey.modernDiscoveryPage, normalized != DISCOVERY_PAGE_MODE_LEGACY)
