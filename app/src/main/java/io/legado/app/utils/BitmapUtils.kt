@@ -105,6 +105,44 @@ object BitmapUtils {
         return BitmapFactory.decodeResource(context.resources, resId, opt)
     }
 
+    fun decodeBitmap(
+        inputFactory: () -> InputStream?,
+        width: Int,
+        height: Int? = null,
+        preferredConfig: Config? = null
+    ): Bitmap? {
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        inputFactory()?.use {
+            BitmapFactory.decodeStream(it, null, options)
+        } ?: return null
+        if (options.outWidth <= 0 || options.outHeight <= 0) return null
+        options.inSampleSize = calculateInSampleSize(options, width, height)
+        options.inJustDecodeBounds = false
+        preferredConfig?.let { options.inPreferredConfig = it }
+        return inputFactory()?.use {
+            BitmapFactory.decodeStream(it, null, options)
+        }
+    }
+
+    fun decodeBitmap(
+        bytes: ByteArray,
+        width: Int,
+        height: Int? = null,
+        preferredConfig: Config? = null
+    ): Bitmap? {
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        if (options.outWidth <= 0 || options.outHeight <= 0) return null
+        options.inSampleSize = calculateInSampleSize(options, width, height)
+        options.inJustDecodeBounds = false
+        preferredConfig?.let { options.inPreferredConfig = it }
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+    }
+
     /**
      * @param context 设备上下文
      * @param resId 资源ID
@@ -137,16 +175,16 @@ object BitmapUtils {
         width: Int,
         height: Int
     ): Bitmap? {
-        var inputStream = context.assets.open(fileNameInAssets)
-        return inputStream.use {
+        context.assets.open(fileNameInAssets).use { inputStream ->
             val op = BitmapFactory.Options()
             // inJustDecodeBounds如果设置为true,仅仅返回图片实际的宽和高,宽和高是赋值给opts.outWidth,opts.outHeight;
             op.inJustDecodeBounds = true
             BitmapFactory.decodeStream(inputStream, null, op) //获取尺寸信息
             op.inSampleSize = calculateInSampleSize(op, width, height)
-            inputStream = context.assets.open(fileNameInAssets)
             op.inJustDecodeBounds = false
-            BitmapFactory.decodeStream(inputStream, null, op)
+            return context.assets.open(fileNameInAssets).use { decodeStream ->
+                BitmapFactory.decodeStream(decodeStream, null, op)
+            }
         }
     }
 
@@ -233,13 +271,59 @@ object BitmapUtils {
 
 }
 
+fun Bitmap.hasTransparentPixels(): Boolean {
+    if (!hasAlpha() || width <= 0 || height <= 0 || isRecycled) return false
+    return runCatching {
+        val pixelCount = width.toLong() * height.toLong()
+        if (pixelCount <= TRANSPARENT_PIXEL_FULL_SCAN_LIMIT) {
+            val row = IntArray(width)
+            for (y in 0 until height) {
+                getPixels(row, 0, width, 0, y, width, 1)
+                for (pixel in row) {
+                    if (Color.alpha(pixel) < 255) return true
+                }
+            }
+            return false
+        }
+        val step = ceil(sqrt(pixelCount.toDouble() / TRANSPARENT_PIXEL_FULL_SCAN_LIMIT)).toInt()
+            .coerceAtLeast(2)
+        var y = 0
+        while (y < height) {
+            var x = 0
+            while (x < width) {
+                if (Color.alpha(getPixel(x, y)) < 255) return true
+                x += step
+            }
+            y += step
+        }
+        false
+    }.getOrDefault(hasAlpha())
+}
+
+private const val TRANSPARENT_PIXEL_FULL_SCAN_LIMIT = 512_000L
+
+fun Bitmap.preferredCoverExtension(): String {
+    return if (hasTransparentPixels()) "png" else "jpg"
+}
+
+fun Bitmap.compressPreservingAlpha(outputStream: OutputStream, jpegQuality: Int = 90): Boolean {
+    val usePng = hasTransparentPixels()
+    return compress(
+        if (usePng) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG,
+        if (usePng) 100 else jpegQuality,
+        outputStream
+    )
+}
+
 /**
  * 获取指定宽高的图片
  */
 fun Bitmap.resizeAndRecycle(newWidth: Int, newHeight: Int): Bitmap {
     //获取新的bitmap
     val bitmap = Toolkit.resize(this, newWidth, newHeight)
-    recycle()
+    if (bitmap !== this && !isRecycled) {
+        recycle()
+    }
     return bitmap
 }
 
@@ -256,6 +340,7 @@ fun Bitmap.stackBlur(radius: Int = 8): Bitmap {
 fun Bitmap.getMeanColor(): Int {
     val width: Int = this.width
     val height: Int = this.height
+    if (width <= 0 || height <= 0 || isRecycled) return Color.TRANSPARENT
     var pixel: Int
     var pixelSumRed = 0
     var pixelSumBlue = 0
@@ -263,8 +348,8 @@ fun Bitmap.getMeanColor(): Int {
     for (i in 0..99) {
         for (j in 70..99) {
             pixel = this.getPixel(
-                (i * width / 100.toFloat()).roundToInt(),
-                (j * height / 100.toFloat()).roundToInt()
+                (i * width / 100.toFloat()).roundToInt().coerceIn(0, width - 1),
+                (j * height / 100.toFloat()).roundToInt().coerceIn(0, height - 1)
             )
             pixelSumRed += Color.red(pixel)
             pixelSumGreen += Color.green(pixel)

@@ -3,14 +3,17 @@ package io.legado.app.help.webView
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.MutableContextWrapper
+import android.graphics.Color
 import android.os.Build
 import android.view.ViewGroup
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import io.legado.app.constant.AppLog
 import io.legado.app.help.config.AppConfig
 import io.legado.app.ui.rss.read.VisibleWebView
 import io.legado.app.utils.setDarkeningAllowed
+import io.legado.app.utils.runOnUI
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,50 +29,89 @@ import kotlin.random.Random
 object WebViewPool {
     const val BLANK_HTML = "about:blank"
     const val DATA_HTML = "data:text/html;charset=utf-8;base64,"
-    // 未使用的、已预初始化的WebView池 (使用栈结构，后进先出，复用缓存)
-    private val idlePool = Stack<PooledWebView>()
-    // 正在使用的WebView集合
-    private val inUsePool = mutableMapOf<String, PooledWebView>()
 
-    private var needInitialize = true
-    private val CACHED_WEB_VIEW_MAX_NUM = max(AppConfig.threadCount / 10, 5) // 池子总容量（闲置+使用）
+    enum class Scope {
+        GLOBAL,
+        DISCOVERY,
+        RSS
+    }
+
+    private class ScopePool(
+        val scope: Scope,
+        val maxCached: Int,
+        val idleTimeout: Long,
+        val lastIdleTimeout: Long
+    ) {
+        val idlePool = Stack<PooledWebView>()
+        val inUsePool = mutableMapOf<String, PooledWebView>()
+        val resettingPool = mutableMapOf<String, PooledWebView>()
+        var needInitialize = true
+        var cleanupJob: Job? = null
+        var destroyJob: Job? = null
+    }
+
+    private val globalMaxCached = max(AppConfig.threadCount / 10, 5)
     private const val IDLE_TIME_OUT: Long = 5 * 60 * 1000 // 闲置5分钟后销毁
     private const val IDLE_TIME_OUT_LAST: Long = 30 * 60 * 1000 // 最后一个闲置30分钟后销毁
-    private val cleanupScope by lazy {
-        CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    private const val SCOPED_WEB_VIEW_MAX_NUM = 2
+    private const val SCOPED_IDLE_TIME_OUT: Long = 30 * 1000
+    private val cleanupScope by lazy { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
+    private val pools = mutableMapOf<Scope, ScopePool>()
+
+    private fun pool(scope: Scope): ScopePool {
+        return pools.getOrPut(scope) {
+            when (scope) {
+                Scope.GLOBAL -> ScopePool(scope, globalMaxCached, IDLE_TIME_OUT, IDLE_TIME_OUT_LAST)
+                Scope.DISCOVERY, Scope.RSS -> ScopePool(
+                    scope,
+                    SCOPED_WEB_VIEW_MAX_NUM,
+                    SCOPED_IDLE_TIME_OUT,
+                    SCOPED_IDLE_TIME_OUT
+                )
+            }
+        }
     }
-    private var cleanupJob: Job? = null
 
     // 获取一个WebView
     @Synchronized
-    fun acquire(context: Context): PooledWebView {
-        val pooledWebView = if (idlePool.isNotEmpty()) {
-            idlePool.pop() // 复用闲置实例
+    fun acquire(context: Context, scope: Scope = Scope.GLOBAL): PooledWebView {
+        val scopePool = pool(scope)
+        scopePool.destroyJob?.cancel()
+        scopePool.destroyJob = null
+        val pooledWebView = if (scopePool.idlePool.isNotEmpty()) {
+            scopePool.idlePool.pop() // 复用闲置实例
         } else {
-            if (needInitialize) {
-                needInitialize = false
-                startCleanupTimer()
+            if (scopePool.needInitialize) {
+                scopePool.needInitialize = false
+                startCleanupTimer(scopePool)
             }
-            createNewWebView() // 创建新实例
+            createNewWebView(scope) // 创建新实例
         }
         pooledWebView.upContext(context).apply {
-            realWebView.settings.apply {
-                setDarkeningAllowed(AppConfig.isNightTheme) //设置是否夜间
-                userAgentString = AppConfig.userAgent
-            }
-            if (inUsePool.isEmpty()) {
+            realWebView.settings.setDarkeningAllowed(AppConfig.isNightTheme) //设置是否夜间
+            if (scopePool.inUsePool.isEmpty()) {
                 realWebView.resumeTimers()
             }
+            isDestroyed = false
             isInUse = true
         }
-        inUsePool[pooledWebView.id] = pooledWebView
+        scopePool.inUsePool[pooledWebView.id] = pooledWebView
+        pooledWebView.realWebView.setBackgroundColor(Color.TRANSPARENT)
         return pooledWebView
     }
 
     // 释放WebView回池
     @Synchronized
     fun release(pooledWebView: PooledWebView) {
-        if (inUsePool.remove(pooledWebView.id) == null) return
+        if (pooledWebView.isDestroyed) return
+        val scopePool = pool(pooledWebView.scope)
+        if (scopePool.inUsePool.remove(pooledWebView.id) == null) {
+            scopePool.resettingPool.remove(pooledWebView.id)
+            pooledWebView.isDestroyed = true
+            pooledWebView.realWebView.destroy()
+            return
+        }
+        scopePool.resettingPool[pooledWebView.id] = pooledWebView
         // 重置WebView状态
         pooledWebView.realWebView.run {
             (parent as? ViewGroup)?.removeView(this)
@@ -78,10 +120,6 @@ object WebViewPool {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
             stopLoading()
-            removeJavascriptInterface(WebJsExtensions.nameBasic)
-            removeJavascriptInterface(WebJsExtensions.nameJava)
-            removeJavascriptInterface(WebJsExtensions.nameSource)
-            removeJavascriptInterface(WebJsExtensions.nameCache)
             clearFocus() //清除焦点
             setOnLongClickListener(null)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -91,13 +129,19 @@ object WebViewPool {
             outlineProvider = null
             clipToOutline = false
             webChromeClient = null
+            removeJavascriptInterface(WebJsExtensions.nameBasic)
+            removeJavascriptInterface(WebJsExtensions.nameJava)
+            removeJavascriptInterface(WebJsExtensions.nameSource)
+            removeJavascriptInterface(WebJsExtensions.nameCache)
             clearFormData() //清除表单数据
             clearMatches() //清除查找匹配项
             clearDisappearingChildren() //清除消失中的子视图
             clearAnimation() //清除动画
             pooledWebView.upContext(appCtx)
-            if (idlePool.size >= CACHED_WEB_VIEW_MAX_NUM - inUsePool.size) {
+            if (scopePool.idlePool.size >= scopePool.maxCached - scopePool.inUsePool.size) {
                 // 池子已满，直接销毁
+                scopePool.resettingPool.remove(pooledWebView.id)
+                pooledWebView.isDestroyed = true
                 pooledWebView.realWebView.destroy()
                 return
             }
@@ -115,28 +159,92 @@ object WebViewPool {
                             loadWithOverviewMode = false // 恢复默认
                             textZoom = 100
                         }
-                        if (inUsePool.isEmpty()) {
+                        if (scopePool.inUsePool.isEmpty()) {
                             webview.pauseTimers()
                         }
                         webview.onPause()
                     }
                     pooledWebView.isInUse = false
                     pooledWebView.lastUseTime = System.currentTimeMillis()
-                    idlePool.push(pooledWebView)
+                    synchronized(this@WebViewPool) {
+                        scopePool.resettingPool.remove(pooledWebView.id)
+                        if (!pooledWebView.isDestroyed) {
+                            scopePool.idlePool.push(pooledWebView)
+                            startCleanupTimer(scopePool)
+                        }
+                    }
                 }
             }
             loadUrl(BLANK_HTML)
         }
     }
 
-    private fun createNewWebView(): PooledWebView {
-        val webView = VisibleWebView(MutableContextWrapper(appCtx))
-        preInitWebView(webView)
-        return PooledWebView(webView, generateId())
+    fun scheduleDestroyScope(scope: Scope, delayMillis: Long = SCOPED_IDLE_TIME_OUT) {
+        if (scope == Scope.GLOBAL) return
+        logScopedDestroy(scope, "计划销毁")
+        val scopePool = synchronized(this) { pool(scope) }
+        scopePool.destroyJob?.cancel()
+        scopePool.destroyJob = cleanupScope.launch {
+            delay(delayMillis)
+            destroyScope(scope)
+        }
     }
 
-    private fun generateId(): String {
-        return "web_${System.currentTimeMillis()}_${Random.nextLong()}"
+    fun destroyScope(scope: Scope) {
+        if (scope == Scope.GLOBAL) return
+        val toDestroy = synchronized(this) {
+            val scopePool = pool(scope)
+            scopePool.destroyJob?.cancel()
+            scopePool.destroyJob = null
+            scopePool.cleanupJob?.cancel()
+            scopePool.cleanupJob = null
+            scopePool.needInitialize = true
+            val list = scopePool.idlePool.toMutableList() +
+                scopePool.inUsePool.values +
+                scopePool.resettingPool.values
+            scopePool.idlePool.clear()
+            scopePool.inUsePool.clear()
+            scopePool.resettingPool.clear()
+            list
+        }
+        logScopedDestroy(scope, "执行销毁", toDestroy.size)
+        toDestroy.forEach { destroyNow(it) }
+    }
+
+    private fun logScopedDestroy(scope: Scope, action: String, count: Int? = null) {
+        val pageName = when (scope) {
+            Scope.DISCOVERY -> "发现页"
+            Scope.RSS -> "订阅页"
+            Scope.GLOBAL -> return
+        }
+        val countText = count?.let { ", count=$it" }.orEmpty()
+        AppLog.put("$pageName WebView $action: scope=${scope.name}$countText")
+    }
+
+    private fun destroyNow(pooledWebView: PooledWebView) {
+        pooledWebView.isDestroyed = true
+        runOnUI {
+            try {
+                pooledWebView.realWebView.run {
+                    (parent as? ViewGroup)?.removeView(this)
+                    stopLoading()
+                    loadUrl(BLANK_HTML)
+                    destroy()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun createNewWebView(scope: Scope): PooledWebView {
+        val webView = VisibleWebView(MutableContextWrapper(appCtx))
+        preInitWebView(webView)
+        return PooledWebView(webView, generateId(scope), scope)
+    }
+
+    private fun generateId(scope: Scope): String {
+        return "web_${scope.name.lowercase()}_${System.currentTimeMillis()}_${Random.nextLong()}"
     }
 
     // 初始化
@@ -156,42 +264,39 @@ object WebViewPool {
             displayZoomControls = false
             textZoom = 100
         }
+        webView.setBackgroundColor(Color.TRANSPARENT)
     }
 
     // 定时清理闲置过久的WebView
-    private fun startCleanupTimer() {
-        if (cleanupJob?.isActive == true) return
-        cleanupJob = cleanupScope.launch {
+    private fun startCleanupTimer(scopePool: ScopePool) {
+        if (scopePool.cleanupJob?.isActive == true) return
+        scopePool.cleanupJob = cleanupScope.launch {
             while (true) {
                 delay(30_000) // 每30秒执行一次清理
                 val now = System.currentTimeMillis()
                 val toRemove = mutableListOf<PooledWebView>()
                 var shouldCancel = false
                 synchronized(this@WebViewPool) {
-                    for ((index, pooled) in idlePool.withIndex()) {
+                    for ((index, pooled) in scopePool.idlePool.withIndex()) {
                         val timeout = if (index == 0) {
-                            IDLE_TIME_OUT_LAST
+                            scopePool.lastIdleTimeout
                         } else {
-                            IDLE_TIME_OUT
+                            scopePool.idleTimeout
                         }
                         if (now - pooled.lastUseTime > timeout) {
                             toRemove.add(pooled)
                         }
                     }
                     toRemove.forEach { pooled ->
-                        idlePool.remove(pooled)
-                        try {
-                            pooled.realWebView.destroy()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
+                        scopePool.idlePool.remove(pooled)
+                        destroyNow(pooled)
                     }
-                    if (idlePool.isEmpty()) {
+                    if (scopePool.idlePool.isEmpty()) {
                         shouldCancel = true
                     }
                 }
                 if (shouldCancel) {
-                    needInitialize = true
+                    scopePool.needInitialize = true
                     this@launch.cancel()
                 }
             }

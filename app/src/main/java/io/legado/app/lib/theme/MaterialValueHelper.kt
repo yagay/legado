@@ -4,12 +4,17 @@ package io.legado.app.lib.theme
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.Drawable
 import androidx.annotation.ColorInt
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.toColorInt
 import androidx.fragment.app.Fragment
 import io.legado.app.R
+import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.ThemeConfig
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
 
@@ -68,25 +73,36 @@ val Context.accentColor: Int
     get() = ThemeStore.accentColor(this)
 
 val Context.backgroundColor: Int
-    get() = ThemeStore.backgroundColor(this)
+    get() = if (!AppConfig.isEInkMode && ThemeConfig.hasUsableBgImage(this)) {
+        Color.TRANSPARENT
+    } else {
+        ThemeStore.backgroundColor(this)
+    }
 
 val Context.bottomBackground: Int
     get() = ThemeStore.bottomBackground(this)
 
 val Context.primaryTextColor: Int
-    get() = getPrimaryTextColor(isDarkTheme)
+    get() = AppConfig.uiFontColor.toThemeTextColorOrNull()
+        ?: defaultThemeTextColor(AppConfig.isNightTheme)
+
+val Context.titleTextColor: Int
+    get() = AppConfig.titleFontColor.toThemeTextColorOrNull()
+        ?: defaultThemeTextColor(AppConfig.isNightTheme)
 
 val Context.transparentNavBar: Boolean
     get() = ThemeStore.transparentNavBar(this)
 
 val Context.secondaryTextColor: Int
-    get() = getSecondaryTextColor(isDarkTheme)
+    get() = AppConfig.uiFontColor.toThemeTextColorOrNull()
+        ?.let { ColorUtils.withAlpha(it, 0.72f) }
+        ?: ColorUtils.withAlpha(defaultThemeTextColor(AppConfig.isNightTheme), 0.72f)
 
 val Context.primaryDisabledTextColor: Int
-    get() = getPrimaryDisabledTextColor(isDarkTheme)
+    get() = getPrimaryDisabledTextColor(!AppConfig.isNightTheme)
 
 val Context.secondaryDisabledTextColor: Int
-    get() = getSecondaryDisabledTextColor(isDarkTheme)
+    get() = getSecondaryDisabledTextColor(!AppConfig.isNightTheme)
 
 val Fragment.primaryColor: Int
     get() = ThemeStore.primaryColor(requireContext())
@@ -98,32 +114,62 @@ val Fragment.accentColor: Int
     get() = ThemeStore.accentColor(requireContext())
 
 val Fragment.backgroundColor: Int
-    get() = ThemeStore.backgroundColor(requireContext())
+    get() = requireContext().backgroundColor
 
 val Fragment.bottomBackground: Int
     get() = ThemeStore.bottomBackground(requireContext())
 
 val Fragment.primaryTextColor: Int
-    get() = requireContext().getPrimaryTextColor(isDarkTheme)
+    get() = AppConfig.uiFontColor.toThemeTextColorOrNull()
+        ?: defaultThemeTextColor(AppConfig.isNightTheme)
 
 val Fragment.secondaryTextColor: Int
-    get() = requireContext().getSecondaryTextColor(isDarkTheme)
+    get() = AppConfig.uiFontColor.toThemeTextColorOrNull()
+        ?.let { ColorUtils.withAlpha(it, 0.72f) }
+        ?: ColorUtils.withAlpha(defaultThemeTextColor(AppConfig.isNightTheme), 0.72f)
 
 val Fragment.primaryDisabledTextColor: Int
-    get() = requireContext().getPrimaryDisabledTextColor(isDarkTheme)
+    get() = requireContext().getPrimaryDisabledTextColor(!AppConfig.isNightTheme)
 
 val Fragment.secondaryDisabledTextColor: Int
-    get() = requireContext().getSecondaryDisabledTextColor(isDarkTheme)
+    get() = requireContext().getSecondaryDisabledTextColor(!AppConfig.isNightTheme)
+
+@ColorInt
+fun String?.toThemeTextColorOrNull(): Int? {
+    val raw = this?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val withoutPrefix = raw
+        .removePrefix("#")
+        .removePrefix("0x")
+        .removePrefix("0X")
+    val candidate = if (
+        withoutPrefix.length in setOf(6, 8) &&
+        withoutPrefix.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
+    ) {
+        "#$withoutPrefix"
+    } else {
+        raw
+    }
+    return kotlin.runCatching { candidate.toColorInt() }.getOrNull()
+}
+
+@ColorInt
+fun defaultThemeTextColor(isNightTheme: Boolean): Int {
+    return if (isNightTheme) Color.WHITE else Color.BLACK
+}
+
+fun defaultThemeTextColorHex(isNightTheme: Boolean): String {
+    return if (isNightTheme) "#FFFFFF" else "#000000"
+}
 
 val Context.buttonDisabledColor: Int
-    get() = if (isDarkTheme) {
+    get() = if (AppConfig.isNightTheme) {
         ContextCompat.getColor(this, R.color.md_dark_disabled)
     } else {
         ContextCompat.getColor(this, R.color.md_light_disabled)
     }
 
 val Context.isDarkTheme: Boolean
-    get() = ColorUtils.isColorLight(ThemeStore.primaryColor(this))
+    get() = AppConfig.isNightTheme
 
 val Fragment.isDarkTheme: Boolean
     get() = requireContext().isDarkTheme
@@ -142,18 +188,22 @@ val Context.elevation: Float
         }
     }
 
-val Context.filletBackground: GradientDrawable
+val Context.filletBackground: Drawable
     get() {
-        val background = GradientDrawable()
-        background.cornerRadius = 3f.dpToPx()
-        background.setColor(backgroundColor)
-        return background
+        return UiCorner.panelRounded(this, backgroundColor, UiCorner.panelRadius(this))
     }
 
-val Context.popupBackground: GradientDrawable
+val Context.dialogSurfaceBackground: GradientDrawable
     get() {
-        val background = GradientDrawable()
-        background.cornerRadius = 12f.dpToPx()
-        background.setColor(bottomBackground)
-        return background
+        val surfaceColor = themeColorOrNull(PreferKey.themeCardColor)
+            ?: ContextCompat.getColor(this, R.color.dialog_surface)
+        return UiCorner.opaqueRounded(surfaceColor, UiCorner.panelRadius(this))
     }
+
+fun Context.filletTopBackground(@ColorInt color: Int): GradientDrawable {
+    val radius = UiCorner.panelRadius(this)
+    return GradientDrawable().apply {
+        cornerRadii = floatArrayOf(radius, radius, radius, radius, 0f, 0f, 0f, 0f)
+        setColor(color)
+    }
+}

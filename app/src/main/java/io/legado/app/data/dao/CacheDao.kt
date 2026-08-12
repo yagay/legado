@@ -1,5 +1,6 @@
 package io.legado.app.data.dao
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -15,11 +16,35 @@ interface CacheDao {
     @Query("select value from caches where `key` = :key and (deadline = 0 or deadline > :now)")
     fun get(key: String, now: Long): String?
 
+    @Query(
+        """select length(cast(value as blob)) as byteCount,
+        case when length(cast(value as blob)) <= :maxBytes then value else null end as value
+        from caches where `key` = :key and (deadline = 0 or deadline > :now)"""
+    )
+    fun getBoundedValue(key: String, now: Long, maxBytes: Long): BoundedCacheValue?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(vararg cache: Cache)
 
+    @Query(
+        """select * from caches
+        where `key` like 'userInfo_%'
+        or `key` like 'sourceVariable_%'
+        or `key` like 'v_%'"""
+    )
+    fun getSourceRuntimeCaches(): List<Cache>
+
     @Query("delete from caches where `key` = :key")
     fun delete(key: String)
+
+    @Query("delete from caches where `key` = :key and value is :value")
+    fun deleteIfValueMatches(key: String, value: String?)
+
+    @Query(
+        """delete from caches where `key` = :key
+        and length(cast(value as blob)) > :maxBytes"""
+    )
+    fun deleteIfValueOversized(key: String, maxBytes: Long)
 
     @Query(
         """delete from caches where `key` like 'v_' || :key || '_%'
@@ -34,3 +59,8 @@ interface CacheDao {
     fun clearDeadline(now: Long)
 
 }
+
+data class BoundedCacheValue(
+    @ColumnInfo(name = "byteCount") val byteCount: Long,
+    @ColumnInfo(name = "value") val value: String?
+)
