@@ -10,6 +10,9 @@
     <dimen name="bookshelf_tag_bar_padding_horizontal">8dp</dimen>
     <dimen name="bookshelf_tag_bar_padding_vertical">4dp</dimen>
     <dimen name="bookshelf_tag_item_padding_horizontal">10dp</dimen>
+    <dimen name="bookshelf_tag_item_height">28dp</dimen>
+    <dimen name="bookshelf_tag_item_margin_horizontal">2dp</dimen>
+    <dimen name="bookshelf_tag_item_min_width">36dp</dimen>
     <dimen name="waterfall_card_gap">8dp</dimen>
     <dimen name="waterfall_card_min_width">148dp</dimen>
     <dimen name="waterfall_card_min_height">210dp</dimen>
