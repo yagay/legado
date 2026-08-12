@@ -199,6 +199,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val discoverTagItems = mutableListOf<DiscoverTagItem>()
     private val discoverSelectItems = mutableListOf<DiscoverTagItem>()
     private val discoverMajorGroups = mutableListOf<String>()
+    private var discoverKindTree: List<ExploreKind> = emptyList()
+    private val discoverTreeSelections = mutableMapOf<Int, String>()
     private val discoverBookshelf = linkedSetOf<String>()
     private val discoverBooks = linkedSetOf<SearchBook>()
     private val composeDiscoverBooks = mutableStateListOf<SearchBook>()
@@ -2815,6 +2817,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         discoverAllTagItems.clear()
         discoverMajorGroups.clear()
         discoverSelectItems.clear()
+        discoverKindTree = emptyList()
+        discoverTreeSelections.clear()
         selectedDiscoverMajorGroup = null
         discoverDefaultFiltersAppliedKey = null
         renderDiscoverTags(emptyList(), -1)
@@ -2874,6 +2878,21 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val source = selectedDiscoverSource ?: return
         val kinds = withContext(IO) {
             source.exploreKinds()
+        }
+        discoverKindTree = kinds
+        if (usingModernDiscovery && kinds.hasDiscoverChildren()) {
+            discoverAllTagItems.clear()
+            discoverTagItems.clear()
+            discoverSelectItems.clear()
+            discoverMajorGroups.clear()
+            selectedDiscoverMajorGroup = null
+            renderDiscoverTags(emptyList(), -1)
+            renderDiscoverSelects(emptyList())
+            updateDiscoverTagFilterButtonState()
+            restoreDiscoverTreeSelections(discoverCurrentUrl)
+            renderModernDiscoveryTree(loadSelectedUrl = true)
+            applyDiscoverDefaultFilterExpansionOnce()
+            return
         }
         val items = buildDiscoverTagItems(source, kinds)
         discoverAllTagItems.clear()
@@ -3271,6 +3290,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             binding.topBar.setDiscoveryFilterRows(emptyList()) { _, _ -> }
             return
         }
+        if (discoverKindTree.hasDiscoverChildren()) {
+            renderModernDiscoveryTree(loadSelectedUrl = false)
+            return
+        }
         data class RowAction(
             val row: io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow,
             val click: (Int) -> Unit
@@ -3350,6 +3373,169 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.topBar.setDiscoveryFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
             actions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
         }
+    }
+
+    private fun renderModernDiscoveryTree(loadSelectedUrl: Boolean) {
+        data class TreeRowAction(
+            val row: io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow,
+            val click: (Int) -> Unit
+        )
+
+        val actions = mutableListOf<TreeRowAction>()
+        var levelItems = discoverKindTree
+        var inheritedTitle: String? = null
+        var lastValidUrl: String? = null
+        var level = 0
+        var steps = 0
+        val safetyLimit = (countDiscoverKinds(discoverKindTree) + 1).coerceAtLeast(16)
+
+        while (levelItems.isNotEmpty() && steps++ < safetyLimit) {
+            while (
+                levelItems.size == 1 &&
+                levelItems.first().discoverTargetUrl().isNullOrBlank() &&
+                !levelItems.first().children.isNullOrEmpty()
+            ) {
+                val container = levelItems.first()
+                inheritedTitle = cleanDiscoverTitle(container.title).ifBlank { inheritedTitle.orEmpty() }
+                levelItems = container.children.orEmpty()
+            }
+            if (levelItems.isEmpty()) break
+
+            val visibleItems = levelItems.filter { cleanDiscoverTitle(it.title).isNotBlank() }
+            if (visibleItems.isEmpty()) break
+            val selectedTitle = discoverTreeSelections[level]
+                ?.takeIf { saved -> visibleItems.any { it.title == saved } }
+                ?: visibleItems.first().title
+            discoverTreeSelections[level] = selectedTitle
+
+            val rowLevel = level
+            actions += TreeRowAction(
+                row = io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                    title = inferDiscoverSelectorTitle(rowLevel, visibleItems, inheritedTitle),
+                    options = visibleItems.map { cleanDiscoverTitle(it.title) },
+                    selectedIndex = visibleItems.indexOfFirst { it.title == selectedTitle }
+                ),
+                click = { optionIndex ->
+                    visibleItems.getOrNull(optionIndex)?.let { selected ->
+                        if (discoverTreeSelections[rowLevel] != selected.title) {
+                            discoverTreeSelections[rowLevel] = selected.title
+                            discoverTreeSelections.keys
+                                .filter { it > rowLevel }
+                                .toList()
+                                .forEach(discoverTreeSelections::remove)
+                            renderModernDiscoveryTree(loadSelectedUrl = true)
+                        }
+                    }
+                }
+            )
+
+            val selected = visibleItems.firstOrNull { it.title == selectedTitle } ?: break
+            selected.discoverTargetUrl()?.let { lastValidUrl = it }
+            inheritedTitle = selected.title
+            levelItems = selected.children.orEmpty()
+            level++
+        }
+
+        binding.topBar.setDiscoveryFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
+            actions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
+        }
+        if (loadSelectedUrl && !lastValidUrl.isNullOrBlank()) {
+            selectModernDiscoverTreeUrl(lastValidUrl)
+        }
+    }
+
+    private fun selectModernDiscoverTreeUrl(url: String) {
+        AppConfig.rememberModernDiscoveryTagUrl(selectedDiscoverSource?.bookSourceUrl, url)
+        if (discoverCurrentUrl == url && discoverBooks.isNotEmpty()) return
+        discoverCurrentUrl = url
+        loadDiscoverBooks(reset = true)
+    }
+
+    private fun restoreDiscoverTreeSelections(preferredUrl: String?) {
+        discoverTreeSelections.clear()
+        if (preferredUrl.isNullOrBlank()) return
+        restoreDiscoverTreeSelectionsAtLevel(discoverKindTree, preferredUrl, 0)
+    }
+
+    private fun restoreDiscoverTreeSelectionsAtLevel(
+        originalKinds: List<ExploreKind>,
+        targetUrl: String,
+        level: Int
+    ): Boolean {
+        var kinds = originalKinds
+        while (
+            kinds.size == 1 &&
+            kinds.first().discoverTargetUrl().isNullOrBlank() &&
+            !kinds.first().children.isNullOrEmpty()
+        ) {
+            kinds = kinds.first().children.orEmpty()
+        }
+        val selected = kinds.firstOrNull { it.containsDiscoverTarget(targetUrl) } ?: return false
+        discoverTreeSelections[level] = selected.title
+        if (selected.discoverTargetUrl() == targetUrl) return true
+        return restoreDiscoverTreeSelectionsAtLevel(selected.children.orEmpty(), targetUrl, level + 1)
+    }
+
+    private fun ExploreKind.containsDiscoverTarget(targetUrl: String): Boolean {
+        return discoverTargetUrl() == targetUrl || children.orEmpty().any { it.containsDiscoverTarget(targetUrl) }
+    }
+
+    private fun inferDiscoverSelectorTitle(
+        level: Int,
+        items: List<ExploreKind>,
+        inheritedTitle: String?
+    ): String {
+        val titles = items.map { cleanDiscoverTitle(it.title) }
+        if (titles.any {
+                it.contains("男频") || it.contains("女频") ||
+                    it.contains("男生频道") || it.contains("女生频道")
+            }) {
+            return getString(R.string.discovery_channel)
+        }
+        if (titles.count { it in DISCOVER_STATUS_TITLES } >= 2) {
+            return getString(R.string.discovery_status)
+        }
+        if (titles.count { it.isDiscoverRankTitle() } >= 2) {
+            return getString(R.string.discovery_ranking)
+        }
+        val inherited = cleanDiscoverTitle(inheritedTitle.orEmpty())
+        if (inherited.isNotBlank()) {
+            when {
+                inherited.contains("排行") || inherited.endsWith("榜") -> return inherited
+                inherited in DISCOVER_STANDARD_SELECTOR_TITLES -> return inherited
+            }
+        }
+        return if (level == 0 && items.all { it.discoverTargetUrl().isNullOrBlank() }) {
+            getString(R.string.discovery_group)
+        } else {
+            getString(R.string.discovery_category)
+        }
+    }
+
+    private fun String.isDiscoverRankTitle(): Boolean {
+        return this in DISCOVER_RANK_TITLES || endsWith("榜") || contains("排行")
+    }
+
+    private fun cleanDiscoverTitle(title: String): String {
+        return title
+            .replace(Regex("[\\[\\]【】?（）<>《》]"), "")
+            .replace(Regex("[\\p{So}\\p{Sk}]+"), "")
+            .replace(Regex("[༺༻ˇ»«`´ʚɞ]+"), "")
+            .trim()
+    }
+
+    private fun ExploreKind.discoverTargetUrl(): String? {
+        if (type != ExploreKind.Type.url) return normalizedDiscoverUrl()
+        return action?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", true) }
+            ?: normalizedDiscoverUrl()
+    }
+
+    private fun List<ExploreKind>.hasDiscoverChildren(): Boolean {
+        return any { !it.children.isNullOrEmpty() || it.children.orEmpty().hasDiscoverChildren() }
+    }
+
+    private fun countDiscoverKinds(kinds: List<ExploreKind>): Int {
+        return kinds.sumOf { 1 + countDiscoverKinds(it.children.orEmpty()) }
     }
 
     private fun applyDiscoverSelectValue(item: DiscoverTagItem, value: String) {
@@ -3958,6 +4144,15 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private companion object {
+        private val DISCOVER_STATUS_TITLES = setOf(
+            "全部", "完结", "连载", "完本", "在更", "已完成", "连载中", "Finished", "Loading"
+        )
+        private val DISCOVER_RANK_TITLES = setOf(
+            "推荐", "评分", "热门", "周榜", "月榜", "总榜", "日榜", "本周", "本月", "本日"
+        )
+        private val DISCOVER_STANDARD_SELECTOR_TITLES = setOf(
+            "分类", "频道", "状态", "榜单", "标签", "类型"
+        )
         private const val DISCOVER_DIALOG_WIDTH_RATIO = 0.90f
         private const val DISCOVER_DIALOG_HEIGHT_RATIO = 0.72f
         private const val MAX_SUITE_SELECTOR_SOURCES = 80
