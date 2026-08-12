@@ -1678,6 +1678,9 @@
     <string name="switch_discovery_page_interface">Switch discovery page interface</string>
     <string name="discovery_category">Category</string>
     <string name="discovery_channel">Channel</string>
+    <string name="discovery_status">Status</string>
+    <string name="discovery_ranking">Ranking</string>
+    <string name="discovery_group">Group</string>
     <string name="discovery_page_mode_legacy">Classic</string>
     <string name="discovery_page_mode_modern">Modern</string>
     <string name="discovery_suite_no_suite">No suite</string>
