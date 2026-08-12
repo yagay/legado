@@ -307,7 +307,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     },
                     onBookClick = ::showBookInfo,
                     onLoadMore = { loadDiscoverBooks(reset = false) },
-                    onCanScrollBackwardChanged = { composeDiscoverCanScrollBackward = it },
+                    onCanScrollBackwardChanged = {
+                        composeDiscoverCanScrollBackward = it
+                        binding.topBar.setDiscoveryFiltersCollapsed(it)
+                    },
                     fragment = this@ExploreFragment,
                     lifecycle = viewLifecycleOwner.lifecycle
                 )
@@ -1725,6 +1728,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.rvDiscoverBooks.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
+                binding.topBar.setDiscoveryFiltersCollapsed(
+                    recyclerView.canScrollVertically(-1)
+                )
                 if (dy > 0 && !recyclerView.canScrollVertically(1)) {
                     loadDiscoverBooks(reset = false)
                 }
@@ -3289,6 +3295,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private fun renderModernDiscoveryFilterRows() {
         if (!usingModernDiscovery) {
             binding.topBar.setDiscoveryFilterRows(emptyList()) { _, _ -> }
+            binding.topBar.setDiscoveryPath(null)
             return
         }
         if (discoverClassificationMode == DiscoverClassificationMode.TREE) {
@@ -3374,6 +3381,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.topBar.setDiscoveryFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
             actions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
         }
+        binding.topBar.setDiscoveryPath(
+            actions.mapNotNull { action ->
+                action.row.options.getOrNull(action.row.selectedIndex)
+                    ?.takeIf(String::isNotBlank)
+            }.joinToString("  ›  ").takeIf { it.isNotBlank() }
+        )
     }
 
     private fun renderModernDiscoveryTree(loadSelectedUrl: Boolean) {
@@ -3465,6 +3478,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.topBar.setDiscoveryFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
             actions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
         }
+        binding.topBar.setDiscoveryPath(
+            actions.mapNotNull { action ->
+                action.row.options.getOrNull(action.row.selectedIndex)
+                    ?.takeIf(String::isNotBlank)
+            }.joinToString("  ›  ").takeIf { it.isNotBlank() }
+        )
         if (loadSelectedUrl && lastValidNode != null) {
             selectModernDiscoverTreeNode(lastValidNode!!)
         }
@@ -3894,6 +3913,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         if (!reset && !discoverHasMore) return
         if (reset) {
             discoverLoadJob?.cancel()
+            binding.topBar.setDiscoveryFiltersCollapsed(false)
+            if (binding.composeDiscoverBooks.isVisible) {
+                composeDiscoverScrollToTopSignal.intValue++
+            } else {
+                binding.rvDiscoverBooks.scrollToPosition(0)
+            }
         } else if (discoverLoading) {
             return
         }
