@@ -347,36 +347,57 @@ class MainTopBarView @JvmOverloads constructor(
             gravity = Gravity.CENTER_VERTICAL
             typeface = context.uiTypeface()
         }, LayoutParams(62.dp, 36.dp))
-        val flex = FlexboxLayout(context).apply {
-            flexWrap = FlexWrap.WRAP
-            clipChildren = false
+        val optionArea = LinearLayout(context).apply {
+            orientation = VERTICAL
         }
-        val expandable = row.options.size > 5
+        var firstRowCount = row.options.size.coerceAtMost(4).coerceAtLeast(1)
         var expanded = false
+
+        fun optionView(optionIndex: Int) = TextView(context).apply {
+            text = row.options[optionIndex]
+            textSize = 14f
+            gravity = Gravity.CENTER
+            maxLines = 1
+            typeface = context.uiTypeface()
+            isSelected = optionIndex == row.selectedIndex
+            setTextColor(if (isSelected) context.accentColor else context.primaryTextColor)
+            background = UiCorner.actionSelector(
+                Color.TRANSPARENT,
+                TopBarConfig.withOpacity(context.accentColor, 16),
+                UiCorner.actionRadius(context)
+            )
+            setPadding(12.dp, 0, 12.dp, 0)
+            setOnClickListener { onOptionClick(rowIndex, optionIndex) }
+        }
+
         fun render() {
-            flex.removeAllViews()
-            val visible = if (expanded || !expandable) row.options.indices else 0 until 5
-            visible.forEach { optionIndex ->
-                flex.addView(TextView(context).apply {
-                    text = row.options[optionIndex]
-                    textSize = 14f
-                    gravity = Gravity.CENTER
-                    typeface = context.uiTypeface()
-                    isSelected = optionIndex == row.selectedIndex
-                    setTextColor(if (isSelected) context.accentColor else context.primaryTextColor)
-                    background = UiCorner.actionSelector(
-                        Color.TRANSPARENT,
-                        TopBarConfig.withOpacity(context.accentColor, 16),
-                        UiCorner.actionRadius(context)
-                    )
-                    setPadding(12.dp, 0, 12.dp, 0)
-                    setOnClickListener { onOptionClick(rowIndex, optionIndex) }
-                }, FlexboxLayout.LayoutParams(LayoutParams.WRAP_CONTENT, 34.dp).apply {
+            optionArea.removeAllViews()
+            val naturalFirstRow = row.options.indices.take(firstRowCount)
+            val ordered = if (
+                row.selectedIndex in row.options.indices &&
+                row.selectedIndex !in naturalFirstRow
+            ) {
+                listOf(row.selectedIndex) + row.options.indices.filter { it != row.selectedIndex }
+            } else {
+                row.options.indices.toList()
+            }
+            val expandable = ordered.size > firstRowCount
+            val topLine = LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                gravity = Gravity.TOP
+            }
+            val topOptions = FlexboxLayout(context).apply {
+                flexWrap = FlexWrap.NOWRAP
+                clipChildren = false
+            }
+            ordered.take(firstRowCount).forEach { optionIndex ->
+                topOptions.addView(optionView(optionIndex), FlexboxLayout.LayoutParams(LayoutParams.WRAP_CONTENT, 34.dp).apply {
                     setMargins(0, 1.dp, 6.dp, 1.dp)
                 })
             }
+            topLine.addView(topOptions, LayoutParams(0, 36.dp, 1f))
             if (expandable) {
-                flex.addView(TextView(context).apply {
+                topLine.addView(TextView(context).apply {
                     text = if (expanded) "︿" else "﹀"
                     textSize = 18f
                     gravity = Gravity.CENTER
@@ -386,11 +407,51 @@ class MainTopBarView @JvmOverloads constructor(
                         render()
                         notifyHeightChangedAfterLayout()
                     }
-                }, FlexboxLayout.LayoutParams(34.dp, 34.dp))
+                }, LayoutParams(34.dp, 34.dp))
+            }
+            optionArea.addView(topLine, LayoutParams(LayoutParams.MATCH_PARENT, 36.dp))
+            if (expanded && expandable) {
+                val extraOptions = FlexboxLayout(context).apply {
+                    flexWrap = FlexWrap.WRAP
+                    clipChildren = false
+                }
+                ordered.drop(firstRowCount).forEach { optionIndex ->
+                    extraOptions.addView(optionView(optionIndex), FlexboxLayout.LayoutParams(LayoutParams.WRAP_CONTENT, 34.dp).apply {
+                        setMargins(0, 1.dp, 6.dp, 1.dp)
+                    })
+                }
+                optionArea.addView(
+                    extraOptions,
+                    LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+                )
             }
         }
         render()
-        line.addView(flex, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        line.addView(optionArea, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        optionArea.post {
+            val availableWidth = (optionArea.width - 34.dp).coerceAtLeast(1)
+            var usedWidth = 0
+            var count = 0
+            for (optionIndex in row.options.indices) {
+                val probe = optionView(optionIndex)
+                probe.measure(
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                    View.MeasureSpec.makeMeasureSpec(34.dp, View.MeasureSpec.EXACTLY)
+                )
+                val measuredWidth = probe.measuredWidth + 6.dp
+                if (count > 0 && usedWidth + measuredWidth > availableWidth) break
+                if (usedWidth + measuredWidth <= availableWidth || count == 0) {
+                    usedWidth += measuredWidth
+                    count++
+                }
+            }
+            val resolved = count.coerceAtLeast(1).coerceAtMost(row.options.size)
+            if (resolved != firstRowCount) {
+                firstRowCount = resolved
+                render()
+                notifyHeightChangedAfterLayout()
+            }
+        }
         return line
     }
 
