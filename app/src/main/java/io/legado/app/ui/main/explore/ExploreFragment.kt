@@ -2871,8 +2871,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val kinds = withContext(IO) {
             source.exploreKinds()
         }
-        discoverKindTree = kinds
-        discoverClassificationMode = detectDiscoverClassificationMode(kinds)
+        discoverKindTree = buildDiscoverSectionMatrixTree(kinds) ?: kinds
+        discoverClassificationMode = detectDiscoverClassificationMode(discoverKindTree)
         if (usingModernDiscovery && discoverClassificationMode == DiscoverClassificationMode.TREE) {
             val rootControls = buildDiscoverTagItems(
                 source,
@@ -3585,6 +3585,90 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         return DiscoverClassificationMode.FLAT
     }
 
+    /**
+     * 部分旧书源用全宽无 URL 项目表达“频道/分类”标题，再用连续 URL 项目表达
+     * “榜单 × 状态”的组合。先还原成频道 -> 分类 -> 状态 -> 榜单树，后续统一
+     * 交给动态树渲染；无法确认是这种结构时返回 null，继续使用原项目分段逻辑。
+     */
+    private fun buildDiscoverSectionMatrixTree(kinds: List<ExploreKind>): List<ExploreKind>? {
+        val channels = mutableListOf<DiscoverMatrixChannel>()
+        var currentChannel: DiscoverMatrixChannel? = null
+        var currentCategory: DiscoverMatrixCategory? = null
+
+        kinds.forEach { kind ->
+            val targetUrl = kind.discoverTargetUrl()
+            val isHeader = targetUrl.isNullOrBlank() &&
+                kind.action.isNullOrBlank() &&
+                isDiscoverFullWidthKind(kind) &&
+                cleanDiscoverTitle(kind.title).isNotBlank()
+            if (isHeader) {
+                val title = cleanDiscoverTitle(kind.title)
+                if (title.contains("男频") || title.contains("女频") ||
+                    title.contains("男生频道") || title.contains("女生频道")
+                ) {
+                    currentChannel = DiscoverMatrixChannel(kind, mutableListOf()).also(channels::add)
+                    currentCategory = null
+                } else if (currentChannel != null) {
+                    currentCategory = DiscoverMatrixCategory(kind, mutableListOf()).also {
+                        currentChannel!!.categories += it
+                    }
+                }
+                return@forEach
+            }
+            if (!targetUrl.isNullOrBlank() && currentCategory != null) {
+                currentCategory!!.leaves += kind
+            }
+        }
+
+        if (channels.size < 2 || channels.any { it.categories.isEmpty() }) return null
+        val rebuiltChannels = channels.mapNotNull { channel ->
+            val categories = channel.categories.mapNotNull(::buildDiscoverMatrixCategory)
+            if (categories.isEmpty()) null else channel.header.copy(
+                url = null,
+                action = null,
+                children = categories
+            )
+        }
+        return rebuiltChannels.takeIf { it.size >= 2 }
+    }
+
+    private fun buildDiscoverMatrixCategory(category: DiscoverMatrixCategory): ExploreKind? {
+        val rankOrder = mutableListOf<String>()
+        val statusOrder = mutableListOf<String>()
+        val combinations = linkedMapOf<String, LinkedHashMap<String, ExploreKind>>()
+        var currentRank: String? = null
+
+        category.leaves.forEach { leaf ->
+            val title = cleanDiscoverTitle(leaf.title)
+            if (title.isDiscoverRankTitle()) {
+                currentRank = title
+                if (title !in rankOrder) rankOrder += title
+            }
+            val rank = currentRank ?: return@forEach
+            val status = if (title.isDiscoverRankTitle()) getString(R.string.all) else title
+            if (status.isBlank()) return@forEach
+            if (status !in statusOrder) statusOrder += status
+            combinations.getOrPut(status) { linkedMapOf() }[rank] = leaf
+        }
+
+        if (rankOrder.size < 2 || statusOrder.size < 2) return null
+        if (statusOrder.any { combinations[it].orEmpty().size < 2 }) return null
+        val statusNodes = statusOrder.mapNotNull { status ->
+            val rankLeaves = rankOrder.mapNotNull { rank ->
+                combinations[status]?.get(rank)?.copy(title = rank, children = null)
+            }
+            if (rankLeaves.isEmpty()) null else ExploreKind(
+                title = status,
+                children = rankLeaves
+            )
+        }
+        return category.header.copy(
+            url = null,
+            action = null,
+            children = statusNodes
+        )
+    }
+
     private fun applyDiscoverSelectValue(item: DiscoverTagItem, value: String) {
         val source = selectedDiscoverSource ?: return
         val key = item.kind.title
@@ -4235,6 +4319,16 @@ private enum class DiscoverClassificationMode {
     SECTION,
     TREE
 }
+
+private data class DiscoverMatrixChannel(
+    val header: ExploreKind,
+    val categories: MutableList<DiscoverMatrixCategory>
+)
+
+private data class DiscoverMatrixCategory(
+    val header: ExploreKind,
+    val leaves: MutableList<ExploreKind>
+)
 
 private data class SuiteRandomDeck(
     val signature: String,
