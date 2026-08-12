@@ -19,4 +19,5 @@
     <item name="text_watcher" type="id" />
     <item name="toolbar_overflow_menu_state" type="id" />
 
+    <item name="main_bottom_bar_space_decoration" type="id" />
 </resources>

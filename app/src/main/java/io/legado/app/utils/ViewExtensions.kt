@@ -2,11 +2,14 @@
 
 package io.legado.app.utils
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Picture
+import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.text.Spanned
 import android.text.style.ImageSpan
@@ -49,6 +52,7 @@ import androidx.core.text.HtmlCompat
 import androidx.core.view.isVisible
 import androidx.core.text.parseAsHtml
 import androidx.core.view.postDelayed
+import io.legado.app.R
 import io.legado.app.help.TextViewTagHandler
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.noties.markwon.Markwon
@@ -171,6 +175,7 @@ fun View.screenshot(bitmap: Bitmap? = null, canvas: Canvas? = null): Bitmap? {
         }
         val c = canvas ?: Canvas()
         c.setBitmap(screenshot)
+        c.drawColor(resolveScreenshotBackgroundColor())
         c.withTranslation(-scrollX.toFloat(), -scrollY.toFloat()) {
             this@screenshot.draw(this)
         }
@@ -185,6 +190,7 @@ fun View.screenshot(bitmap: Bitmap? = null, canvas: Canvas? = null): Bitmap? {
 fun View.screenshot(picture: Picture) {
     if (width > 0 && height > 0) {
         picture.record(width, height) {
+            drawColor(resolveScreenshotBackgroundColor())
             withTranslation(-scrollX.toFloat(), -scrollY.toFloat()) {
                 draw(this)
             }
@@ -195,9 +201,21 @@ fun View.screenshot(picture: Picture) {
 fun View.screenshot(canvasRecorder: CanvasRecorder) {
     if (width > 0 && height > 0) {
         canvasRecorder.record(width, height) {
+            drawColor(resolveScreenshotBackgroundColor())
             draw(this)
         }
     }
+}
+
+private fun View.resolveScreenshotBackgroundColor(): Int {
+    var target: View? = this
+    while (target != null) {
+        (target.background as? ColorDrawable)?.let {
+            if (it.color != Color.TRANSPARENT) return it.color
+        }
+        target = target.parent as? View
+    }
+    return runCatching { context.getCompatColor(R.color.background) }.getOrDefault(Color.WHITE)
 }
 
 fun View.setPaddingBottom(bottom: Int) {
@@ -435,16 +453,68 @@ fun View.applyStatusBarPadding(withInitialPadding: Boolean = false) {
     val initialPadding = if (withInitialPadding) topPadding else 0
     setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
         val insets = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars())
-        topPadding = initialPadding + insets.top
+        if (this is StatusBarInsetAware) {
+            onStatusBarInsetChanged(insets.top, initialPadding)
+        } else {
+            topPadding = initialPadding + insets.top
+        }
         windowInsets
     }
+}
+
+interface StatusBarInsetAware {
+    fun onStatusBarInsetChanged(insetTop: Int, initialPaddingTop: Int)
 }
 
 fun View.applyNavigationBarPadding(withInitialPadding: Boolean = false) {
     val initialPadding = if (withInitialPadding) bottomPadding else 0
     setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
-        bottomPadding = initialPadding + windowInsets.navigationBarHeight
+        val navigationBarHeight = windowInsets.navigationBarHeight
+        val extraPadding = if (navigationBarHeight > 0) 12.dpToPx() else 0
+        bottomPadding = initialPadding + navigationBarHeight + extraPadding
         windowInsets
+    }
+}
+
+fun View.applyMainBottomBarPadding(withInitialPadding: Boolean = false) {
+    val initialPadding = if (withInitialPadding) bottomPadding else 0
+    setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
+        val bottomSpace = windowInsets.navigationBarHeight +
+                resources.getDimensionPixelSize(R.dimen.main_content_bottom_bar_padding)
+        if (this is RecyclerView) {
+            bottomPadding = initialPadding
+            updateMainBottomBarSpaceDecoration(bottomSpace)
+        } else {
+            bottomPadding = initialPadding + bottomSpace
+        }
+        windowInsets
+    }
+}
+
+private fun RecyclerView.updateMainBottomBarSpaceDecoration(bottomSpace: Int) {
+    (getTag(R.id.main_bottom_bar_space_decoration) as? MainBottomBarSpaceDecoration)?.let {
+        if (it.bottomSpace != bottomSpace) {
+            it.bottomSpace = bottomSpace
+            invalidateItemDecorations()
+        }
+        return
+    }
+    val decoration = MainBottomBarSpaceDecoration(bottomSpace)
+    addItemDecoration(decoration)
+    setTag(R.id.main_bottom_bar_space_decoration, decoration)
+}
+
+private class MainBottomBarSpaceDecoration(var bottomSpace: Int) : RecyclerView.ItemDecoration() {
+    override fun getItemOffsets(
+        outRect: Rect,
+        view: View,
+        parent: RecyclerView,
+        state: RecyclerView.State
+    ) {
+        val position = parent.getChildAdapterPosition(view)
+        if (position != RecyclerView.NO_POSITION && position == state.itemCount - 1) {
+            outRect.bottom = bottomSpace
+        }
     }
 }
 
@@ -492,4 +562,3 @@ fun Spinner.setSelectionSafely(position: Int) {
         setSelection(position.coerceIn(0, count - 1))
     }
 }
-

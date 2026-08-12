@@ -8,6 +8,7 @@ plugins {
 
     alias libs.plugins.android.application
     alias libs.plugins.kotlin.android
+    alias libs.plugins.kotlin.compose
     alias libs.plugins.kotlin.parcelize
     alias libs.plugins.room
     alias libs.plugins.ksp
@@ -102,6 +103,7 @@ android {
     }
     buildFeatures {
         buildConfig = true
+        compose = true
         viewBinding = true
     }
     buildTypes {
@@ -230,6 +232,15 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.appcompat.appcompat)
     implementation(libs.activity.ktx)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.reorderable)
+    implementation(libs.miuix.android)
+    implementation(libs.lazycolumnscrollbar)
     implementation(libs.fragment.ktx)
     implementation(libs.preference.ktx)
     implementation(libs.androidx.constraintlayout)
@@ -243,6 +254,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.flexbox)
     implementation(libs.gson)
+    debugImplementation(libs.androidx.compose.ui.tooling)
 
     //lifecycle
     implementation(libs.lifecycle.common.java8)

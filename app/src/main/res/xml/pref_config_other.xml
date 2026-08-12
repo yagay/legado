@@ -43,6 +43,14 @@
             android:title="@string/show_discovery"
             app:iconSpaceReserved="false" />
 
+        <io.legado.app.lib.prefs.NameListPreference
+            android:defaultValue="legacy"
+            android:key="discoveryPageMode"
+            android:title="@string/discovery_page_interface"
+            app:entries="@array/discovery_page_mode_entries"
+            app:entryValues="@array/discovery_page_mode_values"
+            app:iconSpaceReserved="false" />
+
         <io.legado.app.lib.prefs.SwitchPreference
             android:defaultValue="true"
             android:key="showRss"

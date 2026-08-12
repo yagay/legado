@@ -7,6 +7,7 @@ import io.legado.app.BuildConfig
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.lib.theme.ThemeRuntimeKeys
 import io.legado.app.utils.GSON
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
 import io.legado.app.utils.fromJsonObject
@@ -28,6 +29,12 @@ import java.net.InetAddress
 
 @Suppress("MemberVisibilityCanBePrivate", "ConstPropertyName")
 object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
+    const val DISCOVERY_PAGE_MODE_LEGACY = "legacy"
+    const val DISCOVERY_PAGE_MODE_MODERN = "modern"
+    const val DISCOVERY_PAGE_MODE_SUITE = "suite"
+    const val DEFAULT_FAST_SCROLLER_TOUCH_TARGET_DP = 44
+    const val MIN_FAST_SCROLLER_TOUCH_TARGET_DP = 32
+    const val MAX_FAST_SCROLLER_TOUCH_TARGET_DP = 60
     private const val JS_SOURCE_API_PREFS = "js_source_api_credentials"
     private const val JS_SOURCE_API_TOKEN = "token"
 
@@ -50,6 +57,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var clickActionBR = appCtx.getPrefInt(PreferKey.clickActionBR, 1)
     var themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
     var useDefaultCover = appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
+    var loadCoverHighQuality = appCtx.getPrefBoolean(PreferKey.loadCoverHighQuality, false)
     var optimizeRender = CanvasRecorderFactory.isSupport
             && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
     var recordLog = appCtx.getPrefBoolean(PreferKey.recordLog)
@@ -955,9 +963,109 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     val autoUpdateVariant get() = appCtx.getPrefBoolean("autoUpdateVariant", true)
+
+    val immersiveManageBar: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.immersiveManageBar, true)
+
+    var discoveryPageMode: String
+        get() = when (val value = appCtx.getPrefString(PreferKey.discoveryPageMode)) {
+            DISCOVERY_PAGE_MODE_LEGACY, DISCOVERY_PAGE_MODE_MODERN, DISCOVERY_PAGE_MODE_SUITE -> value
+            else -> DISCOVERY_PAGE_MODE_LEGACY
+        }
+        set(value) {
+            val normalized = value.takeIf {
+                it == DISCOVERY_PAGE_MODE_LEGACY || it == DISCOVERY_PAGE_MODE_MODERN ||
+                    it == DISCOVERY_PAGE_MODE_SUITE
+            } ?: DISCOVERY_PAGE_MODE_LEGACY
+            appCtx.putPrefString(PreferKey.discoveryPageMode, normalized)
+            appCtx.putPrefBoolean(PreferKey.modernDiscoveryPage, normalized != DISCOVERY_PAGE_MODE_LEGACY)
+        }
+
+    val modernDiscoveryPage: Boolean
+        get() = discoveryPageMode != DISCOVERY_PAGE_MODE_LEGACY
+
+    var discoveryPageLayout: Int
+        get() = appCtx.getPrefInt(PreferKey.discoveryPageLayout, 1).coerceIn(1, 3)
+        set(value) = appCtx.putPrefInt(PreferKey.discoveryPageLayout, value.coerceIn(1, 3))
+
+    var modernDiscoverySourceUrl: String?
+        get() = appCtx.getPrefString(PreferKey.modernDiscoverySourceUrl)
+        set(value) {
+            if (value.isNullOrBlank()) appCtx.removePref(PreferKey.modernDiscoverySourceUrl)
+            else appCtx.putPrefString(PreferKey.modernDiscoverySourceUrl, value)
+        }
+
+    fun modernDiscoveryTagUrl(sourceUrl: String?): String? {
+        val key = sourceUrl?.takeIf { it.isNotBlank() } ?: return null
+        return modernDiscoveryTagUrlMap()[key]?.takeIf { it.isNotBlank() }
+    }
+
+    fun rememberModernDiscoveryTagUrl(sourceUrl: String?, tagUrl: String?) {
+        val key = sourceUrl?.takeIf { it.isNotBlank() } ?: return
+        val values = modernDiscoveryTagUrlMap().toMutableMap()
+        tagUrl?.takeIf { it.isNotBlank() }?.let { values[key] = it } ?: values.remove(key)
+        if (values.isEmpty()) appCtx.removePref(PreferKey.modernDiscoveryTagUrls)
+        else appCtx.putPrefString(PreferKey.modernDiscoveryTagUrls, GSON.toJson(values))
+    }
+
+    private fun modernDiscoveryTagUrlMap(): Map<String, String> =
+        GSON.fromJsonObject<Map<String, String>>(
+            appCtx.getPrefString(PreferKey.modernDiscoveryTagUrls)
+        ).getOrDefault(emptyMap()).filterKeys { it.isNotBlank() }.filterValues { it.isNotBlank() }
+
+    var bookshelfListItemStyle: Int
+        get() = appCtx.getPrefInt(PreferKey.bookshelfListItemStyle, 0).coerceIn(0, 1)
+        set(value) = appCtx.putPrefInt(PreferKey.bookshelfListItemStyle, value.coerceIn(0, 1))
+
+    var bookshelfHiddenTags: Map<Long, Set<String>>
+        get() = GSON.fromJsonObject<Map<String, List<String>>>(
+            appCtx.getPrefString(PreferKey.bookshelfHiddenTags)
+        ).getOrDefault(emptyMap()).mapNotNull { (key, value) ->
+            key.toLongOrNull()?.let { it to value.filter(String::isNotBlank).toSet() }
+        }.toMap()
+        set(value) {
+            val normalized = value.filterValues { it.isNotEmpty() }.mapKeys { it.key.toString() }
+            if (normalized.isEmpty()) appCtx.removePref(PreferKey.bookshelfHiddenTags)
+            else appCtx.putPrefString(PreferKey.bookshelfHiddenTags, GSON.toJson(normalized))
+        }
+
+    var bookshelfGroupTags: Map<Long, List<String>>
+        get() = GSON.fromJsonObject<Map<String, List<String>>>(
+            appCtx.getPrefString(PreferKey.bookshelfGroupTags)
+        ).getOrDefault(emptyMap()).mapNotNull { (key, value) ->
+            key.toLongOrNull()?.let { it to value.filter(String::isNotBlank).distinct() }
+        }.toMap()
+        set(value) {
+            val normalized = value.filterValues { it.isNotEmpty() }.mapKeys { it.key.toString() }
+            if (normalized.isEmpty()) appCtx.removePref(PreferKey.bookshelfGroupTags)
+            else appCtx.putPrefString(PreferKey.bookshelfGroupTags, GSON.toJson(normalized))
+        }
+
+    var fastScrollerTouchTargetDp: Int
+        get() = appCtx.getPrefInt(PreferKey.fastScrollerTouchTargetDp, DEFAULT_FAST_SCROLLER_TOUCH_TARGET_DP)
+            .coerceIn(MIN_FAST_SCROLLER_TOUCH_TARGET_DP, MAX_FAST_SCROLLER_TOUCH_TARGET_DP)
+        set(value) = appCtx.putPrefInt(
+            PreferKey.fastScrollerTouchTargetDp,
+            value.coerceIn(MIN_FAST_SCROLLER_TOUCH_TARGET_DP, MAX_FAST_SCROLLER_TOUCH_TARGET_DP)
+        )
+
+    var uiFontColor: String
+        get() = appCtx.getPrefString(ThemeRuntimeKeys.uiFontColor(isNightTheme)).orEmpty()
+        set(value) = appCtx.putPrefString(ThemeRuntimeKeys.uiFontColor(isNightTheme), value)
+
+    var titleFontColor: String
+        get() = appCtx.getPrefString(ThemeRuntimeKeys.titleFontColor(isNightTheme)).orEmpty()
+        set(value) = appCtx.putPrefString(ThemeRuntimeKeys.titleFontColor(isNightTheme), value)
+
+    var bookCoverShadow: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.bookCoverShadow, true)
+        set(value) = appCtx.putPrefBoolean(PreferKey.bookCoverShadow, value)
+
+    var dialogAlpha: Int
+        get() = appCtx.getPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), 100).coerceIn(0, 100)
+        set(value) = appCtx.putPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), value.coerceIn(0, 100))
 }
 
 internal fun normalizeJsSourceApiToken(value: String?): String? {
     return value?.trim()?.takeIf { it.isNotEmpty() }
 }
-

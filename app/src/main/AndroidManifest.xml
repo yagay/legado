@@ -311,6 +311,9 @@
             android:launchMode="singleTop" />
         <!-- 发现界面 -->
         <activity
+            android:name=".ui.main.explore.DiscoverySuiteManageActivity"
+            android:launchMode="standard" />
+        <activity
             android:name=".ui.book.explore.ExploreShowActivity"
             android:launchMode="singleTop" />
         <!-- 订阅源调试 -->

@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ui.book.search.SearchActivity">
+    tools:context=".ui.book.explore.ExploreShowActivity">
 
     <io.legado.app.ui.widget.TitleBar
         android:id="@+id/title_bar"
@@ -22,13 +22,10 @@
         app:layout_constraintTop_toBottomOf="@id/title_bar">
 
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_view"
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/compose_list"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-            tools:listitem="@layout/item_search" />
+            android:layout_height="match_parent" />
 
     </io.legado.app.ui.widget.dynamiclayout.DynamicFrameLayout>
 

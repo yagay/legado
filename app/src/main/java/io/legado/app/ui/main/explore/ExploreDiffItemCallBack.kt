@@ -7,7 +7,7 @@ import io.legado.app.data.entities.BookSourcePart
 class ExploreDiffItemCallBack : DiffUtil.ItemCallback<BookSourcePart>() {
 
     override fun areItemsTheSame(oldItem: BookSourcePart, newItem: BookSourcePart): Boolean {
-        return oldItem == newItem
+        return oldItem.bookSourceUrl == newItem.bookSourceUrl
     }
 
     override fun areContentsTheSame(oldItem: BookSourcePart, newItem: BookSourcePart): Boolean {

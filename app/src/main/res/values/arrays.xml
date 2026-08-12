@@ -220,4 +220,14 @@
 		<item>Customize</item>
 	</string-array>
 
+    <string-array name="discovery_page_mode_entries">
+        <item>@string/discovery_page_mode_legacy</item>
+        <item>@string/discovery_page_mode_modern</item>
+        <item>@string/discovery_page_mode_suite</item>
+    </string-array>
+    <string-array name="discovery_page_mode_values">
+        <item>legacy</item>
+        <item>modern</item>
+        <item>suite</item>
+    </string-array>
 </resources>
