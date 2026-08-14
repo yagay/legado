@@ -1,5 +1,6 @@
 package io.legado.app.model.webBook
 
+import com.google.gson.JsonArray
 import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
