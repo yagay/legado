@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -70,6 +71,7 @@ import io.legado.app.ui.widget.compose.SearchBookPreviewOverlay
 import io.legado.app.ui.widget.compose.SearchBookPreviewState
 import io.legado.app.ui.widget.MainTopBarView
 import io.legado.app.ui.widget.image.CoverImageView
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.StringUtils
 import kotlin.math.roundToInt
 
@@ -573,6 +575,7 @@ private fun DiscoverFilterRowView(
                         text = row.title,
                         color = palette.primaryText,
                         fontSize = 15.sp,
+                        fontFamily = palette.titleFontFamily,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.width(62.dp)
@@ -630,16 +633,23 @@ private fun DiscoverFilterOptionChip(
     // 防御:重组时可能以旧 optionIndex 携带新 row 重放,越界时直接跳过该选项。
     val optionText = row.options.getOrNull(optionIndex) ?: return
     val selected = optionIndex == row.selectedIndex
+    val textColor = if (selected) {
+        if (ColorUtils.isColorLight(palette.accent.toArgb())) Color.Black else Color.White
+    } else {
+        palette.primaryText
+    }
     Text(
-        // 分类名首尾带符号时只显示去掉符号的文本,如「玄幻」→玄幻。
+        // 选中项复用书籍 LabelsBar/AccentBgTextView 的视觉规则：
+        // 主题强调色实心背景、按背景亮度自动选择黑白文字、2dp 圆角与 3dp 横向内边距。
         text = StringUtils.stripWrapSymbols(optionText),
-        color = if (selected) palette.accent else palette.primaryText,
+        color = textColor,
         fontSize = 14.sp,
+        fontFamily = palette.bodyFontFamily,
         maxLines = 1,
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) palette.accent.copy(alpha = 0.16f) else Color.Transparent)
+            .clip(RoundedCornerShape(2.dp))
+            .background(if (selected) palette.accent else Color.Transparent)
             .clickable { onOptionClick(rowIndex, optionIndex) }
-            .padding(horizontal = 4.dp, vertical = 0.dp)
+            .padding(horizontal = 3.dp, vertical = 0.dp)
     )
 }
