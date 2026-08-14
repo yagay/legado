@@ -6,7 +6,6 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
-import androidx.room.TypeConverters
 import androidx.room.Update
 import com.google.gson.JsonObject
 import io.legado.app.constant.BookType
@@ -278,51 +277,6 @@ interface BookDao {
 
     @Query("delete from books where type & ${BookType.notShelf} > 0")
     fun deleteNotShelfBook()
-    @Query("SELECT bookUrl, name, author, (type & ${BookType.notShelf}) > 0 AS isNotShelf FROM books")
-    fun flowShelfIdentities(): Flow<List<BookShelfIdentity>>
-
-}
-
-data class BookShelfIdentity(
-    val bookUrl: String,
-    val name: String,
-    val author: String,
-    val isNotShelf: Boolean
-)
-
-@TypeConverters(Book.Converters::class)
-data class BookShelfDisplay(
-    val bookUrl: String,
-    val origin: String,
-    val originName: String,
-    val name: String,
-    val author: String,
-    val intro: String?,
-    val customIntro: String?,
-    val customTag: String?,
-    val coverUrl: String?,
-    val customCoverUrl: String?,
-    val type: Int,
-    val group: Long,
-    val latestChapterTitle: String?,
-    val latestChapterTime: Long,
-    val lastCheckCount: Int,
-    val totalChapterNum: Int,
-    val durChapterTitle: String?,
-    val durChapterIndex: Int,
-    val durChapterTime: Long,
-    val canUpdate: Boolean,
-    val order: Int,
-    val readConfig: Book.ReadConfig?
-) {
-    val isLocal: Boolean get() = type and BookType.local > 0
-    val isAudio: Boolean get() = type and BookType.audio > 0
-    val isVideo: Boolean get() = type and BookType.video > 0
-    val isImage: Boolean get() = type and BookType.image > 0
-    fun getDisplayCover(): String? = customCoverUrl?.takeIf { it.isNotEmpty() } ?: coverUrl
-    fun getDisplayIntro(): String? = customIntro?.takeIf { it.isNotEmpty() } ?: intro
-    fun getUnreadChapterNum(): Int =
-        kotlin.math.max(totalChapterNum - durChapterIndex - 1, 0)
 }
 
 internal fun String?.withAudioPlayMode(playMode: Int): String {
