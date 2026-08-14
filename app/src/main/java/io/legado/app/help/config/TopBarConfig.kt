@@ -5,7 +5,7 @@ import android.graphics.Color
 import androidx.annotation.Keep
 import io.legado.app.R
 import io.legado.app.constant.AppLog
-import io.legado.app.constant.PreferKey
+import io.legado.app.lib.theme.ThemePreferenceKeys
 import io.legado.app.help.AppCloudStorage
 import io.legado.app.lib.theme.themeCardColorOrDefault
 import io.legado.app.lib.theme.themeColorOrNull
@@ -35,8 +35,8 @@ object TopBarConfig {
     const val STYLE_REGULAR = "regular"
     private const val packageFileName = "top_bar.json"
     private const val remoteListTimeoutMillis = 4_000L
-    private const val activeDayKey = PreferKey.topBarPackageDay
-    private const val activeNightKey = PreferKey.topBarPackageNight
+    private const val activeDayKey = "topBarPackageDay"
+    private const val activeNightKey = "topBarPackageNight"
 
     val rootDir: File
         get() = appCtx.externalFiles.getFile("topBarPackages")
@@ -94,7 +94,7 @@ object TopBarConfig {
             name = defaultName(isNight),
             isNightMode = isNight,
             style = style,
-            tagBarColor = context.themeColorOrNull(PreferKey.themeTabBackgroundColor)
+            tagBarColor = context.themeColorOrNull(ThemePreferenceKeys.themeTabBackgroundColor)
                 ?: context.themeMutedColorOrDefault(),
             tagBarAlpha = if (style == STYLE_REGULAR) 0 else 100,
             tagSelectedColor = context.themeCardColorOrDefault(),
