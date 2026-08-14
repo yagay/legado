@@ -259,9 +259,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             } else if (usingSuiteDiscovery) {
                 binding.swipeRefreshLayout.isRefreshing = false
             } else {
-                if (!adapter.refreshExpandedIfNoKinds()) {
-                    upExploreData(searchView?.query?.toString())
-                }
+                upExploreData(searchView?.query?.toString())
             }
         }
         binding.topBar.setMode(io.legado.app.ui.widget.MainTopBarView.Mode.DISCOVERY)
@@ -1768,9 +1766,13 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 searchBook(source)
             })
             add(ModernActionPopup.Action(getString(R.string.refresh)) {
-                adapter.clearSourceKinds(source.bookSourceUrl)
-                if (source.bookSourceUrl == selectedDiscoverSourcePart?.bookSourceUrl) {
-                    loadDiscoverBooks(reset = true)
+                viewLifecycleOwner.lifecycleScope.launch {
+                    withContext(IO) {
+                        source.clearExploreKindsCache()
+                    }
+                    if (source.bookSourceUrl == selectedDiscoverSourcePart?.bookSourceUrl) {
+                        loadDiscoverBooks(reset = true)
+                    }
                 }
             })
             add(
