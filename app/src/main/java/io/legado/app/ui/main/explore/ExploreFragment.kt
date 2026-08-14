@@ -170,7 +170,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private var groupsMenu: SubMenu? = null
     private var oldModeInitialized = false
     private var modernModeInitialized = false
-    private var discoveryPageMode = AppConfig.DISCOVERY_PAGE_MODE_MODERN
+    private var discoveryPageMode = ModernDiscoveryConfig.MODE_MODERN
     private var usingModernDiscovery = false
     private var usingSuiteDiscovery = false
     private var sourceMenuPopup: PopupWindow? = null
@@ -195,7 +195,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val composeDiscoverHasMore = mutableStateOf(true)
     private val composeDiscoverBookshelfVersion = mutableIntStateOf(0)
     private val composeDiscoverTopPadding = mutableIntStateOf(0)
-    private val composeDiscoverLayoutMode = mutableIntStateOf(AppConfig.discoveryPageLayout)
+    private val composeDiscoverLayoutMode = mutableIntStateOf(ModernDiscoveryConfig.layout)
     private val composeDiscoverFilterRows =
         mutableStateOf<List<io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow>>(emptyList())
     private var discoverFilterOptionClick: ((Int, Int) -> Unit)? = null
@@ -233,9 +233,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
-        discoveryPageMode = AppConfig.discoveryPageMode
-        usingModernDiscovery = discoveryPageMode == AppConfig.DISCOVERY_PAGE_MODE_MODERN
-        usingSuiteDiscovery = discoveryPageMode == AppConfig.DISCOVERY_PAGE_MODE_SUITE
+        discoveryPageMode = ModernDiscoveryConfig.pageMode
+        usingModernDiscovery = discoveryPageMode == ModernDiscoveryConfig.MODE_MODERN
+        usingSuiteDiscovery = discoveryPageMode == ModernDiscoveryConfig.MODE_SUITE
         discoveryModeLoaded = false
         binding.swipeRefreshLayout.setColorSchemeColors(accentColor)
         binding.swipeRefreshLayout.setProgressViewOffset(true, (-28).dpToPx(), 56.dpToPx())
@@ -364,19 +364,19 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private fun toggleDiscoveryPageMode() {
-        AppConfig.discoveryPageMode = if (usingModernDiscovery) {
-            AppConfig.DISCOVERY_PAGE_MODE_LEGACY
+        ModernDiscoveryConfig.pageMode = if (usingModernDiscovery) {
+            ModernDiscoveryConfig.MODE_LEGACY
         } else {
-            AppConfig.DISCOVERY_PAGE_MODE_MODERN
+            ModernDiscoveryConfig.MODE_MODERN
         }
         applyDiscoveryMode(loadData = true)
         activity?.invalidateOptionsMenu()
     }
 
     private fun applyDiscoveryMode(loadData: Boolean = true) {
-        val mode = AppConfig.discoveryPageMode
-        val modern = mode == AppConfig.DISCOVERY_PAGE_MODE_MODERN
-        val suite = mode == AppConfig.DISCOVERY_PAGE_MODE_SUITE
+        val mode = ModernDiscoveryConfig.pageMode
+        val modern = mode == ModernDiscoveryConfig.MODE_MODERN
+        val suite = mode == ModernDiscoveryConfig.MODE_SUITE
         discoveryPageMode = mode
         usingModernDiscovery = modern
         usingSuiteDiscovery = suite
@@ -426,13 +426,13 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun scheduleDiscoveryWarmup() {
         discoverWarmupJob?.cancel()
-        if (AppConfig.discoveryPageMode != AppConfig.DISCOVERY_PAGE_MODE_MODERN) return
+        if (ModernDiscoveryConfig.pageMode != ModernDiscoveryConfig.MODE_MODERN) return
         discoverWarmupJob = viewLifecycleOwner.lifecycleScope.launch {
             delay(1800)
             if (
                 !isAdded ||
                 discoveryModeLoaded ||
-                AppConfig.discoveryPageMode != AppConfig.DISCOVERY_PAGE_MODE_MODERN
+                ModernDiscoveryConfig.pageMode != ModernDiscoveryConfig.MODE_MODERN
             ) return@launch
             applyDiscoveryMode(loadData = true)
             discoveryModeLoaded = true
@@ -1374,7 +1374,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private fun applyDiscoverBookLayout(force: Boolean = false) {
-        val layoutMode = AppConfig.discoveryPageLayout
+        val layoutMode = ModernDiscoveryConfig.layout
         val layoutChanged = layoutMode != discoverBookLayoutMode
         composeDiscoverLayoutMode.intValue = layoutMode
         composeDiscoverListStyle.intValue = AppConfig.bookshelfListItemStyle
@@ -1449,7 +1449,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private fun syncDiscoverComposeState(forceBooks: Boolean = false) {
         composeDiscoverLoading.value = discoverLoading
         composeDiscoverHasMore.value = discoverHasMore
-        composeDiscoverLayoutMode.intValue = AppConfig.discoveryPageLayout
+        composeDiscoverLayoutMode.intValue = ModernDiscoveryConfig.layout
         composeDiscoverListStyle.intValue = AppConfig.bookshelfListItemStyle
         // SearchBook.equals 仅比较 bookUrl，直接用 != 无法识别封面/最新章节等内容更新，
         // 且 composeDiscoverBooks(List) 与 discoverBooks(Set) 类型不同，比较恒不相等。
@@ -1660,7 +1660,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     if (discoverSources.isEmpty()) {
                         selectedDiscoverSourcePart = null
                         selectedDiscoverSource = null
-                        AppConfig.modernDiscoverySourceUrl = null
+                        ModernDiscoveryConfig.sourceUrl = null
                         discoverCurrentUrl = null
                         discoverAllTagItems.clear()
                         discoverMajorGroups.clear()
@@ -1677,7 +1677,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                         return@collect
                     }
                     val keepSource = selectedDiscoverSourcePart?.bookSourceUrl
-                        ?: AppConfig.modernDiscoverySourceUrl
+                        ?: ModernDiscoveryConfig.sourceUrl
                     val selected = discoverSources.firstOrNull { it.bookSourceUrl == keepSource }
                         ?: discoverSources.first()
                     if (selectedDiscoverSourcePart?.bookSourceUrl != selected.bookSourceUrl
@@ -1975,7 +1975,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             selectDiscoverTag(index, item, selectTab = true)
         } else {
             discoverCurrentUrl = url
-            AppConfig.rememberModernDiscoveryTagUrl(source.bookSourceUrl, url)
+            ModernDiscoveryConfig.rememberTagUrl(source.bookSourceUrl, url)
             binding.topBar.tagsBar.setSelectedIndex(-1, smooth = false)
             loadDiscoverBooks(reset = true)
         }
@@ -2377,7 +2377,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun selectDiscoverSource(source: BookSourcePart) {
         selectedDiscoverSourcePart = source
-        AppConfig.modernDiscoverySourceUrl = source.bookSourceUrl
+        ModernDiscoveryConfig.sourceUrl = source.bookSourceUrl
         renderDiscoverSourceSelector()
         updateDiscoverLoginButtonState()
         tagFilterPopup?.dismiss()
@@ -2389,7 +2389,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         discoverLoadJob = null
         discoverLoading = false
         binding.pbDiscoverLoading.gone()
-        discoverCurrentUrl = AppConfig.modernDiscoveryTagUrl(source.bookSourceUrl)
+        discoverCurrentUrl = ModernDiscoveryConfig.tagUrl(source.bookSourceUrl)
         discoverBooks.clear()
         syncDiscoverComposeState()
         discoverBookAdapter?.clearItems()
@@ -3160,7 +3160,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun restoreDiscoverTreeSelections(preferredUrl: String?) {
         discoverTreeSelections.clear()
-        val saved = AppConfig.modernDiscoveryTreeSelections(selectedDiscoverSource?.bookSourceUrl)
+        val saved = ModernDiscoveryConfig.treeSelections(selectedDiscoverSource?.bookSourceUrl)
         saved.forEachIndexed { level, title -> discoverTreeSelections[level] = title }
         if (preferredUrl.isNullOrBlank()) return
         val restoredFromUrl = mutableMapOf<Int, String>()
@@ -3176,7 +3176,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun persistDiscoverTreeSelections() {
         val selections = discoverTreeSelections.toSortedMap().values.toList()
-        AppConfig.rememberModernDiscoveryTreeSelections(
+        ModernDiscoveryConfig.rememberTreeSelections(
             selectedDiscoverSource?.bookSourceUrl,
             selections
         )
@@ -3433,11 +3433,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             selectDiscoverTabByCode(index, smooth = true)
         }
         if (discoverCurrentUrl == url && discoverBooks.isNotEmpty()) {
-            AppConfig.rememberModernDiscoveryTagUrl(selectedDiscoverSource?.bookSourceUrl, url)
+            ModernDiscoveryConfig.rememberTagUrl(selectedDiscoverSource?.bookSourceUrl, url)
             return
         }
         discoverCurrentUrl = url
-        AppConfig.rememberModernDiscoveryTagUrl(selectedDiscoverSource?.bookSourceUrl, url)
+        ModernDiscoveryConfig.rememberTagUrl(selectedDiscoverSource?.bookSourceUrl, url)
         loadDiscoverBooks(reset = true)
     }
 
@@ -3756,7 +3756,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     override fun onResume() {
         super.onResume()
-        if (discoveryPageMode != AppConfig.discoveryPageMode || !discoveryModeLoaded) {
+        if (discoveryPageMode != ModernDiscoveryConfig.pageMode || !discoveryModeLoaded) {
             applyDiscoveryMode(loadData = true)
             discoveryModeLoaded = true
         } else if (usingModernDiscovery) {
