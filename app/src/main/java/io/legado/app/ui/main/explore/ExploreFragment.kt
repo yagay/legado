@@ -39,7 +39,6 @@ import androidx.core.os.bundleOf
 import androidx.core.view.doOnLayout
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
-import com.bumptech.glide.Glide
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -47,15 +46,11 @@ import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.bumptech.glide.Priority
-import com.bumptech.glide.load.DecodeFormat
-import com.bumptech.glide.request.RequestOptions
 import com.script.rhino.runScriptWithContext
 import io.legado.app.R
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.AppLog
-import io.legado.app.constant.AppPattern
 import io.legado.app.data.AppDatabase
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
@@ -67,12 +62,8 @@ import io.legado.app.databinding.ItemFilletSelectorSingleBinding
 import io.legado.app.databinding.ItemFilletTextBinding
 import io.legado.app.databinding.ItemFindBookBinding
 import io.legado.app.databinding.FragmentExploreBinding
-import io.legado.app.help.CoverDisplayResolver
-import io.legado.app.help.CoverThumbnailCache
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.TopBarConfig
-import io.legado.app.help.glide.ImageLoader
-import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.help.source.clearExploreKindsCache
 import io.legado.app.help.source.exploreKinds
 import io.legado.app.help.webView.WebViewPool
@@ -144,8 +135,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-import java.util.concurrent.TimeUnit
 
 /**
  * 发现页面
@@ -220,7 +209,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val suiteRuntime = ModernDiscoverySuiteRuntime()
     private val suiteLoader = ModernDiscoverySuiteLoader(suiteRuntime)
     private val suiteWidgetLoadSemaphore = Semaphore(SUITE_WIDGET_LOAD_PARALLELISM)
-    private val suiteCoverPreloadSemaphore = Semaphore(SUITE_COVER_PRELOAD_PARALLELISM)
     private var composeDiscoverCanScrollBackward = false
     private var composeSuiteCanScrollBackward = false
     private var composeDiscoverBooksSignature = ""
@@ -578,7 +566,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     composeSuiteWidgetBooks.containsKey(widget.id) &&
                     (widget.type != DiscoverySuiteWidgetType.RankedList.value ||
                         composeSuiteRankedWidgetBooks.containsKey(widget.id)) -> {
-                    prefetchSuiteCovers(composeSuiteWidgetBooks[widget.id].orEmpty())
+                    ModernDiscoveryCoverPreloader.prefetch(requireContext(), composeSuiteWidgetBooks[widget.id].orEmpty())
                     true
                 }
                 else -> false
@@ -623,7 +611,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     composeSuiteWidgetBooks[widget.id] = rankedBooks.values.flatten()
                     suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
                     composeSuiteLoadingWidgets[widget.id] = false
-                    prefetchSuiteCovers(rankedBooks.values.flatten())
+                    ModernDiscoveryCoverPreloader.prefetch(requireContext(), rankedBooks.values.flatten())
                     return@withPermit
                 }
                 composeSuiteRankedWidgetBooks.remove(widget.id)
@@ -642,9 +630,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 composeSuiteWidgetBooks[widget.id] = books
                 suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
                 composeSuiteLoadingWidgets[widget.id] = false
-                prefetchSuiteCovers(books)
+                ModernDiscoveryCoverPreloader.prefetch(requireContext(), books)
                 if (widget.type == DiscoverySuiteWidgetType.HorizontalBooks.value) {
-                    prefetchSuiteCovers(books.drop(HORIZONTAL_SUITE_VISIBLE_COVER_COUNT))
+                    ModernDiscoveryCoverPreloader.prefetch(requireContext(), books.drop(HORIZONTAL_SUITE_VISIBLE_COVER_COUNT))
                     // 不主动预取下一页，交给横排触底 onHorizontalLoadMore 懒加载。
                 } else {
                     prepareSuiteNextRandomBatch(widget)
@@ -692,7 +680,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         composeSuiteRankedWidgetBooks.putAll(snapshot.rankedWidgetBooks)
         suiteRuntime.widgetSignatures.clear()
         suiteRuntime.widgetSignatures.putAll(snapshot.widgetSignatures)
-        prefetchSuiteCovers(snapshot.widgetBooks.values.flatten())
+        ModernDiscoveryCoverPreloader.prefetch(requireContext(), snapshot.widgetBooks.values.flatten())
     }
 
     private fun saveCurrentSuiteSnapshot() {
@@ -739,7 +727,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     deck.queue.take(RANDOM_SUITE_COVER_PREFETCH_COUNT)
                 }
                 withContext(Main) {
-                    prefetchSuiteCovers(queuedBooks)
+                    ModernDiscoveryCoverPreloader.prefetch(requireContext(), queuedBooks)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -771,7 +759,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     composeSuiteRankedWidgetBooks[widget.id] = rankedBooks
                     composeSuiteWidgetBooks[widget.id] = rankedBooks.values.flatten()
                     suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
-                    prefetchSuiteCovers(rankedBooks.values.flatten())
+                    ModernDiscoveryCoverPreloader.prefetch(requireContext(), rankedBooks.values.flatten())
                     saveCurrentSuiteSnapshot()
                 }
                 } finally {
@@ -787,7 +775,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             if (prepared != null) {
                 composeSuiteWidgetBooks[widget.id] = prepared.books
                 suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
-                prefetchSuiteCovers(prepared.books)
+                ModernDiscoveryCoverPreloader.prefetch(requireContext(), prepared.books)
                 saveCurrentSuiteSnapshot()
                 prepareSuiteNextRandomBatch(widget)
                 return
@@ -808,11 +796,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             if (books.isNotEmpty()) {
                 composeSuiteWidgetBooks[widget.id] = books
                 suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
-                prefetchSuiteCovers(books)
+                ModernDiscoveryCoverPreloader.prefetch(requireContext(), books)
                 saveCurrentSuiteSnapshot()
             }
             if (widget.type == DiscoverySuiteWidgetType.HorizontalBooks.value) {
-                prefetchSuiteCovers(books.drop(HORIZONTAL_SUITE_VISIBLE_COVER_COUNT))
+                ModernDiscoveryCoverPreloader.prefetch(requireContext(), books.drop(HORIZONTAL_SUITE_VISIBLE_COVER_COUNT))
                 // 不主动预取下一页，交给横排触底 onHorizontalLoadMore 懒加载。
             } else {
                 prepareSuiteNextRandomBatch(widget)
@@ -839,7 +827,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             val books = try {
                 withContext(IO) {
                     suiteLoader.loadWidgetBooks(widget).also {
-                        preloadSuiteVisibleCovers(appContext, widget, it)
+                        ModernDiscoveryCoverPreloader.preloadVisible(appContext, widget, it)
                     }
                 }
             } catch (e: CancellationException) {
@@ -851,7 +839,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             if (!isCurrentSuiteWidget(widget)) return@launch
             if (books.isNotEmpty() && widget.deckSignature() == signature) {
                 suiteRuntime.preparedRandomBatches[widget.id] = SuitePreparedBatch(signature, books)
-                prefetchSuiteCovers(books)
+                ModernDiscoveryCoverPreloader.prefetch(requireContext(), books)
             }
             prefetchSuiteWidgetDeck(widget)
             } finally {
@@ -897,7 +885,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             if (merged.size > current.size) {
                 composeSuiteWidgetBooks[widget.id] = merged
                 suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
-                prefetchSuiteCovers(books)
+                ModernDiscoveryCoverPreloader.prefetch(requireContext(), books)
                 latestState.nextPage = page + 1
                 latestState.exhausted = merged.size >= HORIZONTAL_SUITE_MAX_BOOKS
                 saveCurrentSuiteSnapshot()
@@ -951,7 +939,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 composeSuiteRankedWidgetBooks[widget.id] = mergedMap
                 composeSuiteWidgetBooks[widget.id] = mergedMap.values.flatten()
                 suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
-                prefetchSuiteCovers(books)
+                ModernDiscoveryCoverPreloader.prefetch(requireContext(), books)
                 latestState.nextPage = page + 1
                 latestState.exhausted = books.isEmpty()
                 saveCurrentSuiteSnapshot()
@@ -965,96 +953,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         }
     }
 
-    private fun prefetchSuiteCovers(books: List<SearchBook>) {
-        if (!isAdded || books.isEmpty()) return
-        val context = requireContext().applicationContext
-        val options = RequestOptions()
-            .format(DecodeFormat.PREFER_RGB_565)
-            .disallowHardwareConfig()
-            .set(OkHttpModelLoader.loadOnlyWifiOption, AppConfig.loadCoverOnlyWifi)
-        books.asSequence()
-            .distinctBy { "${it.origin}|${it.coverUrl.orEmpty()}|${it.name}|${it.author}" }
-            .take(RANDOM_SUITE_COVER_PREFETCH_COUNT)
-            .forEach { book ->
-                val display = CoverDisplayResolver.resolve(book)
-                if (AppConfig.useDefaultCover && !display.forcePath) return@forEach
-                val path = display.path?.takeIf { it.isNotBlank() } ?: return@forEach
-                val requestOptions = options.clone()
-                display.sourceOrigin?.let { origin ->
-                    requestOptions.set(OkHttpModelLoader.sourceOriginOption, origin)
-                }
-                ImageLoader.load(context, path)
-                    .apply(requestOptions)
-                    .priority(Priority.LOW)
-                    .override(240, 320)
-                    .centerCrop()
-                    .preload(240, 320)
-            }
-    }
-
-    private suspend fun preloadSuiteVisibleCovers(
-        context: Context,
-        widget: DiscoverySuiteWidget,
-        books: List<SearchBook>
-    ) {
-        if (books.isEmpty()) return
-        val visibleCount = when (widget.type) {
-            DiscoverySuiteWidgetType.HorizontalBooks.value -> HORIZONTAL_SUITE_VISIBLE_COVER_COUNT
-            DiscoverySuiteWidgetType.RankedList.value -> RANKED_SUITE_VISIBLE_COVER_COUNT
-            DiscoverySuiteWidgetType.WaterfallBooks.value -> WATERFALL_SUITE_VISIBLE_COVER_COUNT
-            else -> RANDOM_SUITE_BOOK_COUNT
-        }
-        val visibleBooks = books.take(visibleCount)
-        withTimeoutOrNull(SUITE_VISIBLE_COVER_PRELOAD_TIMEOUT_MS) {
-            coroutineScope {
-                visibleBooks.map { book ->
-                    async(IO) {
-                        suiteCoverPreloadSemaphore.withPermit {
-                            preloadSuiteCoverBlocking(context, book)
-                        }
-                    }
-                }.awaitAll()
-            }
-        }
-    }
-
-    private fun preloadSuiteCoverBlocking(context: Context, book: SearchBook) {
-        val display = CoverDisplayResolver.resolve(book)
-        if (AppConfig.useDefaultCover && !display.forcePath) return
-        val path = display.path?.takeIf { it.isNotBlank() } ?: return
-        val cleanName = display.name?.replace(AppPattern.bdRegex, "")?.trim()
-        val cleanAuthor = display.author?.replace(AppPattern.bdRegex, "")?.trim()
-        val thumbKey = "${display.sourceOrigin}|$path|$cleanName|$cleanAuthor"
-        val thumbFile = CoverThumbnailCache.existing(context, thumbKey)
-        var options = RequestOptions()
-            .format(DecodeFormat.PREFER_RGB_565)
-            .disallowHardwareConfig()
-            .set(OkHttpModelLoader.loadOnlyWifiOption, AppConfig.loadCoverOnlyWifi)
-        display.sourceOrigin?.let { origin ->
-            options = options.set(OkHttpModelLoader.sourceOriginOption, origin)
-        }
-        val request = if (thumbFile != null) {
-            ImageLoader.load(context, thumbFile)
-        } else {
-            ImageLoader.load(context, path)
-        }
-        val target = request
-            .apply(options)
-            .priority(Priority.HIGH)
-            .override(SUITE_COVER_THUMB_WIDTH, SUITE_COVER_THUMB_HEIGHT)
-            .centerCrop()
-            .submit(SUITE_COVER_THUMB_WIDTH, SUITE_COVER_THUMB_HEIGHT)
-        try {
-            val drawable = target.get(SUITE_SINGLE_COVER_PRELOAD_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            if (thumbFile == null) {
-                CoverThumbnailCache.saveBlocking(context, thumbKey, drawable)
-            }
-        } catch (_: Throwable) {
-            // Network or malformed cover failures should not block the widget refresh.
-        } finally {
-            runCatching { Glide.with(context).clear(target) }
-        }
-    }
 
     private fun openSuiteManagePage() {
         startActivity<DiscoverySuiteManageActivity>()
@@ -4089,18 +3987,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         private const val MAX_SUITE_SELECTOR_SOURCES = 80
         private const val MAX_SUITE_SELECTOR_TARGETS = 160
         private const val SUITE_WIDGET_LOAD_PARALLELISM = 4
-        private const val SUITE_COVER_PRELOAD_PARALLELISM = 4
         private const val RANDOM_SUITE_BOOK_COUNT = 6
         private const val RANDOM_SUITE_PREFETCH_COUNT = 18
-        private const val RANDOM_SUITE_COVER_PREFETCH_COUNT = 18
         private const val HORIZONTAL_SUITE_VISIBLE_COVER_COUNT = 3
         private const val HORIZONTAL_SUITE_MAX_BOOKS = 72
-        private const val RANKED_SUITE_VISIBLE_COVER_COUNT = 12
-        private const val WATERFALL_SUITE_VISIBLE_COVER_COUNT = 8
-        private const val SUITE_COVER_THUMB_WIDTH = 240
-        private const val SUITE_COVER_THUMB_HEIGHT = 320
-        private const val SUITE_SINGLE_COVER_PRELOAD_TIMEOUT_MS = 1000L
-        private const val SUITE_VISIBLE_COVER_PRELOAD_TIMEOUT_MS = 1800L
     }
 
 }
