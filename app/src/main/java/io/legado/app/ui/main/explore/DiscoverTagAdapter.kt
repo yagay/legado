@@ -7,6 +7,8 @@ data class DiscoverTagItem(
     val text: String,
     val role: Role,
     val group: String? = null,
+    val sourceIndex: Int = Int.MAX_VALUE,
+    val groupSourceIndex: Int = Int.MAX_VALUE,
 ) {
     enum class Role {
         UrlTag,
