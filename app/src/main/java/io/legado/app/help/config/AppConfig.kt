@@ -963,34 +963,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val immersiveManageBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.immersiveManageBar, true)
 
-    var bookshelfListItemStyle: Int
-        get() = appCtx.getPrefInt(PreferKey.bookshelfListItemStyle, 0).coerceIn(0, 1)
-        set(value) = appCtx.putPrefInt(PreferKey.bookshelfListItemStyle, value.coerceIn(0, 1))
-
-    var bookshelfHiddenTags: Map<Long, Set<String>>
-        get() = GSON.fromJsonObject<Map<String, List<String>>>(
-            appCtx.getPrefString(PreferKey.bookshelfHiddenTags)
-        ).getOrDefault(emptyMap()).mapNotNull { (key, value) ->
-            key.toLongOrNull()?.let { it to value.filter(String::isNotBlank).toSet() }
-        }.toMap()
-        set(value) {
-            val normalized = value.filterValues { it.isNotEmpty() }.mapKeys { it.key.toString() }
-            if (normalized.isEmpty()) appCtx.removePref(PreferKey.bookshelfHiddenTags)
-            else appCtx.putPrefString(PreferKey.bookshelfHiddenTags, GSON.toJson(normalized))
-        }
-
-    var bookshelfGroupTags: Map<Long, List<String>>
-        get() = GSON.fromJsonObject<Map<String, List<String>>>(
-            appCtx.getPrefString(PreferKey.bookshelfGroupTags)
-        ).getOrDefault(emptyMap()).mapNotNull { (key, value) ->
-            key.toLongOrNull()?.let { it to value.filter(String::isNotBlank).distinct() }
-        }.toMap()
-        set(value) {
-            val normalized = value.filterValues { it.isNotEmpty() }.mapKeys { it.key.toString() }
-            if (normalized.isEmpty()) appCtx.removePref(PreferKey.bookshelfGroupTags)
-            else appCtx.putPrefString(PreferKey.bookshelfGroupTags, GSON.toJson(normalized))
-        }
-
     var fastScrollerTouchTargetDp: Int
         get() = appCtx.getPrefInt(PreferKey.fastScrollerTouchTargetDp, DEFAULT_FAST_SCROLLER_TOUCH_TARGET_DP)
             .coerceIn(MIN_FAST_SCROLLER_TOUCH_TARGET_DP, MAX_FAST_SCROLLER_TOUCH_TARGET_DP)
