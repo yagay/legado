@@ -34,7 +34,7 @@ object UiCorner {
     private var panelBitmap: Bitmap? = null
 
     fun scale(): Float {
-        return AppConfig.uiCornerScale.coerceIn(0f, 3f)
+        return ThemeShapeConfig.cornerScale.coerceIn(0f, 3f)
     }
 
     fun panelRadius(context: Context): Float {
@@ -50,7 +50,7 @@ object UiCorner {
     }
 
     fun searchRadius(value: Float): Float {
-        return if (AppConfig.uiCornerSearchFollow) {
+        return if (ThemeShapeConfig.searchFollowsCorner) {
             scaledDp(value)
         } else {
             value.dpToPx()
@@ -58,7 +58,7 @@ object UiCorner {
     }
 
     fun replyRadius(value: Float): Float {
-        return if (AppConfig.uiCornerReplyFollow) {
+        return if (ThemeShapeConfig.replyFollowsCorner) {
             scaledDp(value)
         } else {
             value.dpToPx()
@@ -68,7 +68,7 @@ object UiCorner {
     fun effectMode(): String = "solid"
 
     fun layoutAlpha(): Float {
-        return AppConfig.uiLayoutAlpha.coerceIn(0, 100) / 100f
+        return ThemeShapeConfig.layoutAlpha.coerceIn(0, 100) / 100f
     }
 
     fun surfaceColor(color: Int, pressed: Boolean = false): Int {
