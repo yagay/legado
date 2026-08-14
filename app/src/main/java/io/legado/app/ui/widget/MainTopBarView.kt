@@ -84,7 +84,9 @@ class MainTopBarView @JvmOverloads constructor(
         textSize = 14f
         typeface = context.uiTypeface()
         setTextColor(context.secondaryTextColor)
-        setPadding(0, 0, 0, 0)
+        val horizontalInset =
+            resources.getDimensionPixelSize(R.dimen.bookshelf_tag_bar_padding_horizontal)
+        setPadding(horizontalInset, 0, horizontalInset, 0)
         isVisible = false
     }
     private val primaryFilterRow = LinearLayout(context)
@@ -382,6 +384,9 @@ class MainTopBarView @JvmOverloads constructor(
             textSize = 15f
             gravity = Gravity.CENTER_VERTICAL
             typeface = context.uiTypeface()
+            val horizontalInset =
+                resources.getDimensionPixelSize(R.dimen.bookshelf_tag_bar_padding_horizontal)
+            setPadding(horizontalInset, 0, 0, 0)
         }, LayoutParams(62.dp, 32.dp))
         val optionArea = LinearLayout(context).apply {
             orientation = VERTICAL
