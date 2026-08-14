@@ -1744,15 +1744,31 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.rvDiscoverBooks.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
-                discoverFilterScrollY = if (recyclerView.canScrollVertically(-1)) {
-                    (discoverFilterScrollY + dy).coerceAtLeast(0)
-                } else {
-                    0
-                }
-                val collapseThreshold = binding.topBar.discoveryFilterCollapseThreshold()
-                binding.topBar.setDiscoveryFiltersCollapsed(
+                val filtersCollapsed = if (discoverBookLayoutMode == 2) {
+                    // 瀑布流的分类仍位于顶栏，按顶栏分类的实际高度折叠。
+                    discoverFilterScrollY = if (recyclerView.canScrollVertically(-1)) {
+                        (discoverFilterScrollY + dy).coerceAtLeast(0)
+                    } else {
+                        0
+                    }
+                    val collapseThreshold = binding.topBar.discoveryFilterCollapseThreshold()
                     collapseThreshold > 0 && discoverFilterScrollY >= collapseThreshold
-                )
+                } else {
+                    // 原始列表直接复用上游 ExploreShowAdapter 的 Header 和
+                    // LinearLayoutManager 可见位置，不再累计一套容易失真的滚动距离。
+                    val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+                    val firstPosition =
+                        layoutManager?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
+                    when {
+                        firstPosition == RecyclerView.NO_POSITION -> false
+                        firstPosition > 0 -> true
+                        firstPosition < 0 -> false
+                        else -> layoutManager?.findViewByPosition(0)?.bottom
+                            ?.let { it <= recyclerView.paddingTop }
+                            ?: false
+                    }
+                }
+                binding.topBar.setDiscoveryFiltersCollapsed(filtersCollapsed)
                 if (dy > 0 && !recyclerView.canScrollVertically(1)) {
                     loadDiscoverBooks(reset = false)
                 }
