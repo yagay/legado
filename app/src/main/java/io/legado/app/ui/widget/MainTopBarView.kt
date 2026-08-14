@@ -113,6 +113,7 @@ class MainTopBarView @JvmOverloads constructor(
     private var filtersExpanded = false
     private var discoveryFiltersCollapsed = false
     private var hasDiscoveryRows = false
+    private var lastDiscoveryRowsHeight = 0
     private var searchEntryRequested = true
     private var onHeightChanged: (() -> Unit)? = null
     private var onFilterExpandedChanged: ((Boolean) -> Unit)? = null
@@ -315,6 +316,12 @@ class MainTopBarView @JvmOverloads constructor(
         rows.forEachIndexed { rowIndex, row ->
             discoveryRows.addView(buildDiscoveryFilterRow(rowIndex, row, onOptionClick))
         }
+        discoveryRows.post {
+            if (discoveryRows.measuredHeight > 0) {
+                lastDiscoveryRowsHeight = discoveryRows.measuredHeight
+            }
+        }
+        updateDiscoveryPathVisibility()
         notifyHeightChangedAfterLayout()
     }
 
@@ -322,17 +329,34 @@ class MainTopBarView @JvmOverloads constructor(
      * 分类滚出屏幕后只保留当前路径，形成位于书籍列表上方的粘性标题。
      */
     fun setDiscoveryFiltersCollapsed(collapsed: Boolean) {
-        if (discoveryFiltersCollapsed == collapsed) return
+        if (discoveryFiltersCollapsed == collapsed) {
+            updateDiscoveryPathVisibility()
+            return
+        }
+        if (discoveryRows.measuredHeight > 0) {
+            lastDiscoveryRowsHeight = discoveryRows.measuredHeight
+        }
         discoveryFiltersCollapsed = collapsed
         discoveryRows.isVisible = hasDiscoveryRows && !collapsed
+        updateDiscoveryPathVisibility()
         notifyHeightChangedAfterLayout()
     }
 
     fun setDiscoveryPath(path: String?) {
-        val value = path?.trim().orEmpty()
-        discoveryPath.text = value
-        discoveryPath.isVisible = value.isNotEmpty()
+        discoveryPath.text = path?.trim().orEmpty()
+        updateDiscoveryPathVisibility()
         notifyHeightChangedAfterLayout()
+    }
+
+    fun discoveryFilterCollapseThreshold(): Int {
+        return discoveryRows.measuredHeight
+            .takeIf { it > 0 }
+            ?: lastDiscoveryRowsHeight
+    }
+
+    private fun updateDiscoveryPathVisibility() {
+        discoveryPath.isVisible =
+            discoveryFiltersCollapsed && discoveryPath.text.isNotBlank()
     }
 
     private fun buildDiscoveryFilterRow(
