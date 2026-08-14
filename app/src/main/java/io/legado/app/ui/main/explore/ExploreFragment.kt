@@ -724,7 +724,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             try {
                 val queuedBooks = deck.mutex.withLock {
                     suiteLoader.fillRandomDeckLocked(widget, deck, RANDOM_SUITE_PREFETCH_COUNT)
-                    deck.queue.take(RANDOM_SUITE_COVER_PREFETCH_COUNT)
+                    deck.queue.take(RANDOM_SUITE_PREFETCH_COUNT)
                 }
                 withContext(Main) {
                     ModernDiscoveryCoverPreloader.prefetch(requireContext(), queuedBooks)
