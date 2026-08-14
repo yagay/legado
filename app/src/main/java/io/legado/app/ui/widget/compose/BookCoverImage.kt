@@ -53,6 +53,7 @@ import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.CoverDisplayResolver
 import io.legado.app.help.CoverThumbnailCache
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.CoverDisplayConfig
 import io.legado.app.help.config.CoverCollectionManager
 import io.legado.app.help.config.CoverCollectionManager.isRealCoverPath
 import io.legado.app.help.glide.ImageLoader
@@ -178,7 +179,7 @@ fun BookCoverImage(
     val defaultBitmap = rememberDefaultCoverBitmap()
     val cleanName = remember(name) { name?.replace(AppPattern.bdRegex, "")?.trim() }
     val cleanAuthor = remember(author) { author?.replace(AppPattern.bdRegex, "")?.trim() }
-    val useThumb = preferThumb && !AppConfig.loadCoverHighQuality
+    val useThumb = preferThumb && !CoverDisplayConfig.loadHighQuality
     val hasRealCover = remember(path) { path.isRealCoverPath() }
     val drawNameOverlay = allowNameOverlay
         ?: ((AppConfig.useDefaultCover && !forcePath) || !hasRealCover)
@@ -192,7 +193,7 @@ fun BookCoverImage(
         sourceOrigin,
         loadOnlyWifi,
         AppConfig.useDefaultCover,
-        AppConfig.loadCoverHighQuality,
+        CoverDisplayConfig.loadHighQuality,
         CoverCollectionManager.selectionKey(),
         useThumb,
         forcePath,
@@ -206,7 +207,7 @@ fun BookCoverImage(
             sourceOrigin.orEmpty(),
             loadOnlyWifi.toString(),
             AppConfig.useDefaultCover.toString(),
-            AppConfig.loadCoverHighQuality.toString(),
+            CoverDisplayConfig.loadHighQuality.toString(),
             CoverCollectionManager.selectionKey(),
             useThumb.toString(),
             forcePath.toString(),
@@ -308,7 +309,7 @@ fun BookCoverImage(
 
     val currentOnBoundsChanged by rememberUpdatedState(onBoundsChanged)
     val themeSignature = rememberThemeUiPalette().signature
-    val coverShadowEnabled = remember(themeSignature) { AppConfig.bookCoverShadow }
+    val coverShadowEnabled = remember(themeSignature) { CoverDisplayConfig.shadowEnabled }
     val shape = RoundedCornerShape(style.radiusDp.dp)
     val frameModifier = modifier
         .then(if (fillBounds) Modifier else Modifier.aspectRatio(BOOK_COVER_ASPECT_RATIO))
