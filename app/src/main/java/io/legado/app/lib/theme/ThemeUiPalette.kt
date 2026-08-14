@@ -37,54 +37,54 @@ data class ThemeUiPalette(
 )
 
 private val themeUiColorKeys = listOf(
-    PreferKey.themeCardColor,
-    PreferKey.themeCardColorN,
-    PreferKey.themeMutedColor,
-    PreferKey.themeMutedColorN,
-    PreferKey.themeSearchFieldBackgroundColor,
-    PreferKey.themeSearchFieldBackgroundColorN,
-    PreferKey.themeTabBackgroundColor,
-    PreferKey.themeTabBackgroundColorN,
-    PreferKey.themeShelfColor,
-    PreferKey.themeShelfColorN
+    ThemePreferenceKeys.themeCardColor,
+    ThemePreferenceKeys.themeCardColorN,
+    ThemePreferenceKeys.themeMutedColor,
+    ThemePreferenceKeys.themeMutedColorN,
+    ThemePreferenceKeys.themeSearchFieldBackgroundColor,
+    ThemePreferenceKeys.themeSearchFieldBackgroundColorN,
+    ThemePreferenceKeys.themeTabBackgroundColor,
+    ThemePreferenceKeys.themeTabBackgroundColorN,
+    ThemePreferenceKeys.themeShelfColor,
+    ThemePreferenceKeys.themeShelfColorN
 )
 private val themeUiShapeKeys = listOf(
-    PreferKey.panelBorderColor,
-    PreferKey.panelBorderColorN,
-    PreferKey.panelBorderAlpha,
-    PreferKey.panelBorderAlphaN,
-    PreferKey.panelBgImage,
-    PreferKey.panelBgImageN,
-    PreferKey.panelBgScaleType,
-    PreferKey.panelBgScaleTypeN,
-    PreferKey.uiCornerScale,
-    PreferKey.uiCornerScaleN,
-    PreferKey.uiCornerSearchFollow,
-    PreferKey.uiCornerSearchFollowN,
-    PreferKey.uiCornerReplyFollow,
-    PreferKey.uiCornerReplyFollowN,
-    PreferKey.uiLayoutAlpha,
-    PreferKey.uiLayoutAlphaN,
-    PreferKey.uiCornerEffectLevel,
-    PreferKey.dialogAlpha,
-    PreferKey.dialogAlphaN,
-    PreferKey.themeCardShadow,
-    PreferKey.themeCardShadowN,
-    PreferKey.themeCardBackgroundBlur,
-    PreferKey.themeCardBackgroundBlurN,
+    ThemePreferenceKeys.panelBorderColor,
+    ThemePreferenceKeys.panelBorderColorN,
+    ThemePreferenceKeys.panelBorderAlpha,
+    ThemePreferenceKeys.panelBorderAlphaN,
+    ThemePreferenceKeys.panelBgImage,
+    ThemePreferenceKeys.panelBgImageN,
+    ThemePreferenceKeys.panelBgScaleType,
+    ThemePreferenceKeys.panelBgScaleTypeN,
+    ThemePreferenceKeys.uiCornerScale,
+    ThemePreferenceKeys.uiCornerScaleN,
+    ThemePreferenceKeys.uiCornerSearchFollow,
+    ThemePreferenceKeys.uiCornerSearchFollowN,
+    ThemePreferenceKeys.uiCornerReplyFollow,
+    ThemePreferenceKeys.uiCornerReplyFollowN,
+    ThemePreferenceKeys.uiLayoutAlpha,
+    ThemePreferenceKeys.uiLayoutAlphaN,
+    ThemePreferenceKeys.uiCornerEffectLevel,
+    ThemePreferenceKeys.dialogAlpha,
+    ThemePreferenceKeys.dialogAlphaN,
+    ThemePreferenceKeys.themeCardShadow,
+    ThemePreferenceKeys.themeCardShadowN,
+    ThemePreferenceKeys.themeCardBackgroundBlur,
+    ThemePreferenceKeys.themeCardBackgroundBlurN,
     CoverDisplayConfig.COVER_SHADOW_KEY
 )
 private val themeUiTypographyKeys = listOf(
     PreferKey.fontScale,
-    PreferKey.fontScaleN,
-    PreferKey.uiFontPath,
-    PreferKey.uiFontPathN,
-    PreferKey.titleFontPath,
-    PreferKey.titleFontPathN,
-    PreferKey.uiFontColor,
-    PreferKey.uiFontColorN,
-    PreferKey.titleFontColor,
-    PreferKey.titleFontColorN
+    ThemePreferenceKeys.fontScaleN,
+    ThemePreferenceKeys.uiFontPath,
+    ThemePreferenceKeys.uiFontPathN,
+    ThemePreferenceKeys.titleFontPath,
+    ThemePreferenceKeys.titleFontPathN,
+    ThemePreferenceKeys.uiFontColor,
+    ThemePreferenceKeys.uiFontColorN,
+    ThemePreferenceKeys.titleFontColor,
+    ThemePreferenceKeys.titleFontColorN
 )
 private val themeUiDependencyKeySet = (
     themeUiColorKeys + themeUiShapeKeys + themeUiTypographyKeys + listOf(
@@ -101,8 +101,8 @@ private val themeUiDependencyKeySet = (
 ).toSet()
 
 fun Context.themeUiPalette(): ThemeUiPalette {
-    val customCardColor = themeColorOrNull(PreferKey.themeCardColor)
-    val customMutedColor = themeColorOrNull(PreferKey.themeMutedColor)
+    val customCardColor = themeColorOrNull(ThemePreferenceKeys.themeCardColor)
+    val customMutedColor = themeColorOrNull(ThemePreferenceKeys.themeMutedColor)
     return ThemeUiPalette(
         cardColor = customCardColor ?: themeCardColorOrDefault(),
         mutedColor = customMutedColor ?: themeMutedColorOrDefault(),
@@ -153,10 +153,10 @@ fun Context.themeUiSignature(): String {
         "${key}=${getPrefString(key).orEmpty()}"
     }
     val shapePrefs = listOf(
-        "border=${getPrefString(PreferKey.panelBorderColor).orEmpty()}",
-        "borderN=${getPrefString(PreferKey.panelBorderColorN).orEmpty()}",
-        "borderAlpha=${getPrefInt(PreferKey.panelBorderAlpha, 100)}",
-        "borderAlphaN=${getPrefInt(PreferKey.panelBorderAlphaN, 100)}",
+        "border=${getPrefString(ThemePreferenceKeys.panelBorderColor).orEmpty()}",
+        "borderN=${getPrefString(ThemePreferenceKeys.panelBorderColorN).orEmpty()}",
+        "borderAlpha=${getPrefInt(ThemePreferenceKeys.panelBorderAlpha, 100)}",
+        "borderAlphaN=${getPrefInt(ThemePreferenceKeys.panelBorderAlphaN, 100)}",
         "corner=${getPrefString(ThemeRuntimeKeys.uiCornerScale(), "1").orEmpty()}",
         "searchFollow=${ThemeShapeConfig.searchFollowsCorner}",
         "replyFollow=${ThemeShapeConfig.replyFollowsCorner}",
@@ -184,8 +184,8 @@ fun Context.themeUiSignature(): String {
 }
 
 private fun Context.themePanelImageSignature(): String {
-    val imageKey = if (AppConfig.isNightTheme) PreferKey.panelBgImageN else PreferKey.panelBgImage
-    val scaleKey = if (AppConfig.isNightTheme) PreferKey.panelBgScaleTypeN else PreferKey.panelBgScaleType
+    val imageKey = if (AppConfig.isNightTheme) ThemePreferenceKeys.panelBgImageN else ThemePreferenceKeys.panelBgImage
+    val scaleKey = if (AppConfig.isNightTheme) ThemePreferenceKeys.panelBgScaleTypeN else ThemePreferenceKeys.panelBgScaleType
     val path = getPrefString(imageKey).orEmpty()
     val mode = getPrefString(scaleKey).orEmpty()
     val fileKey = path.takeUnless { it.isBlank() || it.startsWith("http", ignoreCase = true) }
@@ -198,32 +198,32 @@ private fun Context.themePanelImageSignature(): String {
 
 @ColorInt
 fun Context.themeCardColorOrDefault(): Int {
-    return themeColorOrDefault(PreferKey.themeCardColor, R.color.background_card)
+    return themeColorOrDefault(ThemePreferenceKeys.themeCardColor, R.color.background_card)
 }
 
 @ColorInt
 fun Context.themeMutedColorOrDefault(): Int {
-    return themeColorOrDefault(PreferKey.themeMutedColor, R.color.background_menu)
+    return themeColorOrDefault(ThemePreferenceKeys.themeMutedColor, R.color.background_menu)
 }
 
 @ColorInt
 fun Context.themeSearchFieldBackgroundColorOrDefault(): Int {
-    return themeColorOrDefault(PreferKey.themeSearchFieldBackgroundColor, R.color.background_menu)
+    return themeColorOrDefault(ThemePreferenceKeys.themeSearchFieldBackgroundColor, R.color.background_menu)
 }
 
 @ColorInt
 fun Context.themeSearchFieldBackgroundColorOrNull(): Int? {
-    return themeColorOrNull(PreferKey.themeSearchFieldBackgroundColor)
+    return themeColorOrNull(ThemePreferenceKeys.themeSearchFieldBackgroundColor)
 }
 
 @ColorInt
 fun Context.themeTabBackgroundColorOrDefault(): Int {
-    return themeColorOrDefault(PreferKey.themeTabBackgroundColor, R.color.background_menu)
+    return themeColorOrDefault(ThemePreferenceKeys.themeTabBackgroundColor, R.color.background_menu)
 }
 
 @ColorInt
 fun Context.themeShelfColorOrDefault(): Int {
-    return themeColorOrNull(PreferKey.themeShelfColor) ?: backgroundColor
+    return themeColorOrNull(ThemePreferenceKeys.themeShelfColor) ?: backgroundColor
 }
 
 @ColorInt
@@ -237,8 +237,8 @@ fun Context.themeDividerColorOrDefault(): Int {
 }
 
 fun Context.hasCustomThemeSurfaceColors(): Boolean {
-    return themeColorOrNull(PreferKey.themeCardColor) != null ||
-        themeColorOrNull(PreferKey.themeMutedColor) != null
+    return themeColorOrNull(ThemePreferenceKeys.themeCardColor) != null ||
+        themeColorOrNull(ThemePreferenceKeys.themeMutedColor) != null
 }
 
 @ColorInt
