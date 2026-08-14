@@ -64,6 +64,7 @@ import io.legado.app.databinding.ItemFilletTextBinding
 import io.legado.app.databinding.ItemFindBookBinding
 import io.legado.app.databinding.FragmentExploreBinding
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.BookshelfDisplayConfig
 import io.legado.app.help.config.TopBarConfig
 import io.legado.app.help.source.clearExploreKindsCache
 import io.legado.app.help.source.exploreKinds
@@ -196,7 +197,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val composeDiscoverFilterRows =
         mutableStateOf<List<io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow>>(emptyList())
     private var discoverFilterOptionClick: ((Int, Int) -> Unit)? = null
-    private val composeDiscoverListStyle = mutableIntStateOf(AppConfig.bookshelfListItemStyle)
+    private val composeDiscoverListStyle = mutableIntStateOf(BookshelfDisplayConfig.listItemStyle)
     private val composeDiscoverScrollToTopSignal = mutableIntStateOf(0)
     private val composeSuiteScrollToTopSignal = mutableIntStateOf(0)
     private val composeSuiteConfig = mutableStateOf(DiscoverySuiteStore.load())
@@ -1372,7 +1373,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val layoutMode = ModernDiscoveryConfig.layout
         val layoutChanged = layoutMode != discoverBookLayoutMode
         composeDiscoverLayoutMode.intValue = layoutMode
-        composeDiscoverListStyle.intValue = AppConfig.bookshelfListItemStyle
+        composeDiscoverListStyle.intValue = BookshelfDisplayConfig.listItemStyle
 
         // 网格继续使用 Compose；列表直接复用上游二级发现页的 ExploreShowAdapter，
         // 瀑布流保留专用适配器。这样列表项目样式和行为只由上游实现维护。
@@ -1445,7 +1446,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         composeDiscoverLoading.value = discoverLoading
         composeDiscoverHasMore.value = discoverHasMore
         composeDiscoverLayoutMode.intValue = ModernDiscoveryConfig.layout
-        composeDiscoverListStyle.intValue = AppConfig.bookshelfListItemStyle
+        composeDiscoverListStyle.intValue = BookshelfDisplayConfig.listItemStyle
         // SearchBook.equals 仅比较 bookUrl，直接用 != 无法识别封面/最新章节等内容更新，
         // 且 composeDiscoverBooks(List) 与 discoverBooks(Set) 类型不同，比较恒不相等。
         // 这里用渲染相关字段构造内容签名，只有真正变化时才重建列表，避免无谓重组 churn。
