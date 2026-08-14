@@ -72,7 +72,7 @@ private val themeUiShapeKeys = listOf(
     PreferKey.themeCardShadowN,
     PreferKey.themeCardBackgroundBlur,
     PreferKey.themeCardBackgroundBlurN,
-    PreferKey.bookCoverShadow
+    CoverDisplayConfig.COVER_SHADOW_KEY
 )
 private val themeUiTypographyKeys = listOf(
     PreferKey.fontScale,
