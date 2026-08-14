@@ -70,6 +70,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.UiCorner
+import io.legado.app.lib.theme.ThemeTypographyConfig
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
@@ -126,8 +127,8 @@ fun rememberAppSettingPalette(): AppSettingPalette {
     val themeUiPalette = rememberThemeUiPalette()
     val rowBaseColor = themeUiPalette.cardColor
     // 文字/强调前景色按实际背景明暗推导，避免随 night 标志产生深底深字/浅底白字
-    val customUiText = AppConfig.uiFontColor.toThemeTextColorOrNull()
-    val customTitleText = AppConfig.titleFontColor.toThemeTextColorOrNull()
+    val customUiText = ThemeTypographyConfig.uiFontColor.toThemeTextColorOrNull()
+    val customTitleText = ThemeTypographyConfig.titleFontColor.toThemeTextColorOrNull()
     val secondaryText = if (customUiText != null) {
         Color(customUiText).copy(alpha = 0.72f)
     } else {
