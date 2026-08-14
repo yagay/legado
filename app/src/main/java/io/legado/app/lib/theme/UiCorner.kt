@@ -153,11 +153,11 @@ object UiCorner {
         alphaMultiplier: Float = 1f
     ): Drawable? {
         val path = context.getPrefString(
-            if (AppConfig.isNightTheme) PreferKey.panelBgImageN else PreferKey.panelBgImage
+            if (AppConfig.isNightTheme) ThemePreferenceKeys.panelBgImageN else ThemePreferenceKeys.panelBgImage
         )
         val bitmap = loadPanelBitmap(path) ?: return null
         val mode = context.getPrefString(
-            if (AppConfig.isNightTheme) PreferKey.panelBgScaleTypeN else PreferKey.panelBgScaleType
+            if (AppConfig.isNightTheme) ThemePreferenceKeys.panelBgScaleTypeN else ThemePreferenceKeys.panelBgScaleType
         ) ?: "crop"
         return RoundedBitmapDrawable(
             bitmap = bitmap,
@@ -169,7 +169,7 @@ object UiCorner {
 
     fun warmPanelBitmap(context: Context = appCtx) {
         val path = context.getPrefString(
-            if (AppConfig.isNightTheme) PreferKey.panelBgImageN else PreferKey.panelBgImage
+            if (AppConfig.isNightTheme) ThemePreferenceKeys.panelBgImageN else ThemePreferenceKeys.panelBgImage
         )
         loadPanelBitmap(path)
     }
@@ -250,13 +250,13 @@ object UiCorner {
     }
 
     fun panelBorderColor(context: Context): Int? {
-        val key = if (AppConfig.isNightTheme) PreferKey.panelBorderColorN else PreferKey.panelBorderColor
+        val key = if (AppConfig.isNightTheme) ThemePreferenceKeys.panelBorderColorN else ThemePreferenceKeys.panelBorderColor
         val value = context.getPrefString(key)?.takeIf { it.isNotBlank() } ?: return null
         return runCatching { applyPanelBorderAlpha(context, value.toColorInt()) }.getOrNull()
     }
 
     fun panelBorderAlpha(context: Context): Int {
-        val key = if (AppConfig.isNightTheme) PreferKey.panelBorderAlphaN else PreferKey.panelBorderAlpha
+        val key = if (AppConfig.isNightTheme) ThemePreferenceKeys.panelBorderAlphaN else ThemePreferenceKeys.panelBorderAlpha
         return context.getPrefInt(key, 100).coerceIn(0, 100)
     }
 
