@@ -148,13 +148,4 @@
         <item name="android:textSize">12sp</item>
     </style>
 
-    <style name="AnimDialogCenter">
-        <item name="android:windowEnterAnimation">@anim/dialog_center_enter</item>
-        <item name="android:windowExitAnimation">@anim/dialog_center_exit</item>
-    </style>
-    <style name="Theme.Legado.ComposeDialog.Center" parent="@android:style/Theme.Dialog">
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowAnimationStyle">@style/AnimDialogCenter</item>
-    </style>
 </resources>
