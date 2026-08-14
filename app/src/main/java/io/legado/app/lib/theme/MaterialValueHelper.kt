@@ -75,8 +75,13 @@ val Context.accentColor: Int
 val Context.backgroundColor: Int
     get() = ThemeStore.backgroundColor(this)
 
-val Context.popupBackground: Drawable
-    get() = filletBackground
+val Context.popupBackground: GradientDrawable
+    get() {
+        val background = GradientDrawable()
+        background.cornerRadius = 12f.dpToPx()
+        background.setColor(bottomBackground)
+        return background
+    }
 
 val Context.bottomBackground: Int
     get() = ThemeStore.bottomBackground(this)
@@ -200,9 +205,12 @@ val Context.elevation: Float
         }
     }
 
-val Context.filletBackground: Drawable
+val Context.filletBackground: GradientDrawable
     get() {
-        return UiCorner.panelRounded(this, backgroundColor, UiCorner.panelRadius(this))
+        val background = GradientDrawable()
+        background.cornerRadius = 3f.dpToPx()
+        background.setColor(backgroundColor)
+        return background
     }
 
 val Context.dialogSurfaceBackground: GradientDrawable
