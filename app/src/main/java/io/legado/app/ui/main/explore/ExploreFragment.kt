@@ -1813,7 +1813,28 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         } else {
             binding.rvDiscoverBooks.layoutManager = LinearLayoutManager(requireContext())
             binding.rvDiscoverBooks.addItemDecoration(discoverListDivider)
-            ExploreShowAdapter(requireContext(), this)
+            ExploreShowAdapter(requireContext(), this).apply {
+                addHeaderView { parent ->
+                    val headerView = androidx.compose.ui.platform.ComposeView(parent.context).apply {
+                        setViewCompositionStrategy(
+                            ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+                        )
+                        setContent {
+                            LegadoComposeTheme {
+                                DiscoverFilterHeaderForRecycler(
+                                    rows = composeDiscoverFilterRows.value,
+                                    onOptionClick = { rowIndex, optionIndex ->
+                                        discoverFilterOptionClick?.invoke(rowIndex, optionIndex)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    object : androidx.viewbinding.ViewBinding {
+                        override fun getRoot(): View = headerView
+                    }
+                }
+            }
         }
         discoverBookAdapter?.also { adapter ->
             binding.rvDiscoverBooks.adapter = adapter
@@ -3367,8 +3388,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     /**
-     * 分类筛选行分发:Compose 网格布局下渲染进列表头；
-     * 原始列表与瀑布流使用顶栏筛选行，由 setDiscoveryFiltersCollapsed 控制折叠；
+     * 分类筛选行分发:原始列表和 Compose 网格均渲染进列表头，随内容滚动；
+     * 瀑布流使用顶栏筛选行，由 setDiscoveryFiltersCollapsed 控制折叠；
      * 选中路径固定渲染进悬浮顶栏。
      */
     private fun submitDiscoverFilterRows(
@@ -3382,7 +3403,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 ?.takeIf(String::isNotBlank)
         }.joinToString("  ›  ").takeIf { it.isNotBlank() }
         binding.topBar.setDiscoveryPath(path)
-        if (composeDiscoverLayoutMode.intValue == 3) {
+        if (composeDiscoverLayoutMode.intValue != 2) {
             composeDiscoverFilterRows.value = rows
             discoverFilterOptionClick = onOptionClick
             binding.topBar.setDiscoveryFilterRows(emptyList()) { _, _ -> }

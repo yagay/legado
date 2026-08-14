@@ -439,6 +439,24 @@ private fun ExploreBookListItem(
 }
 
 /**
+ * RecyclerView 原始二级列表复用的分类头。书籍项继续由 ExploreShowAdapter 负责，
+ * 此处只提供会随列表滚动的现代分类区域。
+ */
+@Composable
+internal fun DiscoverFilterHeaderForRecycler(
+    rows: List<MainTopBarView.DiscoveryFilterRow>,
+    onOptionClick: (Int, Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    DiscoverFilterHeader(
+        rows = rows,
+        onOptionClick = onOptionClick,
+        renderConfig = rememberBookshelfListRenderConfig(),
+        modifier = modifier
+    )
+}
+
+/**
  * 现代发现页分类筛选列表头:随列表滚动,向下滑动时自然向上滚出屏幕,回到顶部时恢复。
  */
 @Composable
