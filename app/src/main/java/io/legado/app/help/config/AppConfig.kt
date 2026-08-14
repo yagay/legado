@@ -29,9 +29,6 @@ import java.net.InetAddress
 
 @Suppress("MemberVisibilityCanBePrivate", "ConstPropertyName")
 object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
-    const val DEFAULT_FAST_SCROLLER_TOUCH_TARGET_DP = 44
-    const val MIN_FAST_SCROLLER_TOUCH_TARGET_DP = 32
-    const val MAX_FAST_SCROLLER_TOUCH_TARGET_DP = 60
     private const val JS_SOURCE_API_PREFS = "js_source_api_credentials"
     private const val JS_SOURCE_API_TOKEN = "token"
 
@@ -959,17 +956,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     val autoUpdateVariant get() = appCtx.getPrefBoolean("autoUpdateVariant", true)
-
-    val immersiveManageBar: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.immersiveManageBar, true)
-
-    var fastScrollerTouchTargetDp: Int
-        get() = appCtx.getPrefInt(PreferKey.fastScrollerTouchTargetDp, DEFAULT_FAST_SCROLLER_TOUCH_TARGET_DP)
-            .coerceIn(MIN_FAST_SCROLLER_TOUCH_TARGET_DP, MAX_FAST_SCROLLER_TOUCH_TARGET_DP)
-        set(value) = appCtx.putPrefInt(
-            PreferKey.fastScrollerTouchTargetDp,
-            value.coerceIn(MIN_FAST_SCROLLER_TOUCH_TARGET_DP, MAX_FAST_SCROLLER_TOUCH_TARGET_DP)
-        )
 
 
 }
