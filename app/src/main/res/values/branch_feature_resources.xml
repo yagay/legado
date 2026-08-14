@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="book_info_frost">#DDF1F2F6</color>
+    <color name="glass_stroke">#668FA8C8</color>
+
+    <dimen name="main_content_bottom_bar_padding">90dp</dimen>
+    <dimen name="bookshelf_tag_bar_margin_horizontal">16dp</dimen>
+    <dimen name="bookshelf_action_button_size">34dp</dimen>
+    <dimen name="bookshelf_action_button_padding">8dp</dimen>
+    <dimen name="bookshelf_title_row_margin_top">8dp</dimen>
+    <dimen name="bookshelf_title_select_height">42dp</dimen>
+    <dimen name="bookshelf_title_arrow_size">18dp</dimen>
+    <dimen name="bookshelf_tag_bar_height">38dp</dimen>
+    <dimen name="bookshelf_tag_bar_margin_top">8dp</dimen>
+    <dimen name="top_bar_regular_action_size">36dp</dimen>
+    <dimen name="ui_panel_radius">10dp</dimen>
+    <dimen name="ui_action_radius">9dp</dimen>
+
+    <item name="menu_discovery_page_mode" type="id" />
+    <item name="main_bottom_bar_space_decoration" type="id" />
+
+    <style name="AnimDialogCenter">
+        <item name="android:windowEnterAnimation">@anim/dialog_center_enter</item>
+        <item name="android:windowExitAnimation">@anim/dialog_center_exit</item>
+    </style>
+    <style name="Theme.Legado.ComposeDialog.Center" parent="@android:style/Theme.Dialog">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@style/AnimDialogCenter</item>
+    </style>
+</resources>
