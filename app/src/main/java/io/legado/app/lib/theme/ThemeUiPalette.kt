@@ -17,6 +17,7 @@ import androidx.core.graphics.toColorInt
 import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.CoverDisplayConfig
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.getPrefInt
@@ -163,7 +164,7 @@ fun Context.themeUiSignature(): String {
         "dialogAlpha=${AppConfig.dialogAlpha}",
         "cardShadow=${getPrefInt(ThemeRuntimeKeys.themeCardShadow(), -1)}",
         "cardBackgroundBlur=${getPrefInt(ThemeRuntimeKeys.themeCardBackgroundBlur(), -1)}",
-        "bookCoverShadow=${AppConfig.bookCoverShadow}",
+        "bookCoverShadow=${CoverDisplayConfig.shadowEnabled}",
         "fontScale=${getPrefInt(ThemeRuntimeKeys.fontScale(), 0)}",
         "uiFont=${getPrefString(ThemeRuntimeKeys.uiFontPath()).orEmpty()}",
         "titleFont=${getPrefString(ThemeRuntimeKeys.titleFontPath()).orEmpty()}",
