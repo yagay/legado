@@ -132,8 +132,8 @@ object SourceSelectDialog {
         dialog.setContentView(composeView)
         dialog.setOnShowListener {
             val width = minOf(
-                (context.windowManager.windowSize.widthPixels * 0.94f).toInt(),
-                520.dpToPx()
+                360.dpToPx(),
+                context.windowManager.windowSize.widthPixels - 32.dpToPx()
             )
             dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
             dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
@@ -334,7 +334,8 @@ private fun <T> SourceSelectContent(
                                     minHeight = 48.dp,
                                     compact = false,
                                     textAlign = TextAlign.Start,
-                                    fontSize = 14.sp
+                                    fontSize = 14.sp,
+                                    reverseMarquee = true
                                 )
                             }
                         }
