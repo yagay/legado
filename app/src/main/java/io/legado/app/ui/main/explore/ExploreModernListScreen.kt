@@ -132,7 +132,20 @@ fun ExploreModernListScreen(
     }
     val filterHeaderHidden by remember(filterRows) {
         derivedStateOf {
-            filterRows.isNotEmpty() && listState.firstVisibleItemIndex > 0
+            if (filterRows.isEmpty()) {
+                false
+            } else {
+                val layoutInfo = listState.layoutInfo
+                val header = layoutInfo.visibleItemsInfo.firstOrNull {
+                    it.key == "discover_filter_header"
+                }
+                val hasScrolled = listState.firstVisibleItemIndex > 0 ||
+                    listState.firstVisibleItemScrollOffset > 0
+                hasScrolled && (
+                    header == null ||
+                        header.offset + header.size <= layoutInfo.viewportStartOffset
+                    )
+            }
         }
     }
     val renderConfig = rememberBookshelfListRenderConfig()
@@ -276,7 +289,20 @@ private fun ExploreModernGridScreen(
     }
     val filterHeaderHidden by remember(filterRows) {
         derivedStateOf {
-            filterRows.isNotEmpty() && gridState.firstVisibleItemIndex > 0
+            if (filterRows.isEmpty()) {
+                false
+            } else {
+                val layoutInfo = gridState.layoutInfo
+                val header = layoutInfo.visibleItemsInfo.firstOrNull {
+                    it.key == "discover_filter_header"
+                }
+                val hasScrolled = gridState.firstVisibleItemIndex > 0 ||
+                    gridState.firstVisibleItemScrollOffset > 0
+                hasScrolled && (
+                    header == null ||
+                        header.offset + header.size <= layoutInfo.viewportStartOffset
+                    )
+            }
         }
     }
     val renderConfig = rememberBookshelfListRenderConfig()
