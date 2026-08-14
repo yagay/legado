@@ -102,8 +102,6 @@ import io.legado.app.ui.widget.compose.showComposeConfirmDialog
 import io.legado.app.ui.widget.compose.showComposeMultiChoiceDialog
 import io.legado.app.ui.widget.compose.showComposeTextInputDialog
 import io.legado.app.utils.SearchBookMergeUtils
-import io.legado.app.utils.applyMainBottomBarPadding
-import io.legado.app.utils.applyStatusBarPadding
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChange
@@ -263,7 +261,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         }
         binding.topBar.setMode(io.legado.app.ui.widget.MainTopBarView.Mode.DISCOVERY)
         binding.topBar.setSearchEntryVisible(true)
-        binding.topBar.applyStatusBarPadding(withInitialPadding = true)
+        binding.topBar.applyModernStatusBarPadding()
         binding.topBar.doOnLayout {
             updateModernTopBarOverlay()
         }
