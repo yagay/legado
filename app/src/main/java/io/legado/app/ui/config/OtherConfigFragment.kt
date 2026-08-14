@@ -21,6 +21,7 @@ import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppFreezeMonitor
 import io.legado.app.help.DispatchersMonitor
 import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.main.explore.modern.ModernDiscoveryConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.normalizeJsSourceApiToken
 import io.legado.app.help.http.Cronet
@@ -273,7 +274,7 @@ class OtherConfigFragment : PreferenceFragment(),
             }
 
             PreferKey.showDiscovery, PreferKey.showRss -> postEvent(EventBus.NOTIFY_MAIN, true)
-            PreferKey.discoveryPageMode -> postEvent(EventBus.NOTIFY_MAIN, false)
+            ModernDiscoveryConfig.KEY_PAGE_MODE -> postEvent(EventBus.NOTIFY_MAIN, false)
             PreferKey.language -> listView.postDelayed(1000) {
                 appCtx.restart()
             }
