@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import io.legado.app.R
 import androidx.annotation.Keep
-import io.legado.app.constant.PreferKey
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.AppCloudStorage
@@ -32,6 +31,10 @@ object CoverCollectionManager {
     const val MODE_MIXED = "mixed"
     private const val indexFileName = "collections.json"
     private const val packageFileName = "collection.json"
+    private const val collectionDayKey = "coverCollectionDay"
+    private const val collectionModeDayKey = "coverCollectionModeDay"
+    private const val collectionModeNightKey = "coverCollectionModeNight"
+    private const val collectionNightKey = "coverCollectionNight"
     private val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "bmp")
     @Volatile
     private var dayCache: List<Collection>? = null
@@ -51,7 +54,7 @@ object CoverCollectionManager {
     fun isMixedMode(): Boolean {
         val isNight = AppConfig.isNightTheme
         return appCtx.getPrefString(
-            if (isNight) PreferKey.coverCollectionModeNight else PreferKey.coverCollectionModeDay,
+            if (isNight) collectionModeNightKey else collectionModeDayKey,
             MODE_RANDOM
         ) == MODE_MIXED
     }
@@ -59,10 +62,10 @@ object CoverCollectionManager {
     fun selectionKey(): String {
         val isNight = AppConfig.isNightTheme
         val collectionId = appCtx.getPrefString(
-            if (isNight) PreferKey.coverCollectionNight else PreferKey.coverCollectionDay
+            if (isNight) collectionNightKey else collectionDayKey
         ).orEmpty()
         val mode = appCtx.getPrefString(
-            if (isNight) PreferKey.coverCollectionModeNight else PreferKey.coverCollectionModeDay,
+            if (isNight) collectionModeNightKey else collectionModeDayKey,
             MODE_RANDOM
         ).orEmpty()
         return "$isNight:$collectionId:$mode"
@@ -104,7 +107,7 @@ object CoverCollectionManager {
     }
 
     suspend fun selectedEntry(isNight: Boolean): Entry? = withContext(IO) {
-        val key = if (isNight) PreferKey.coverCollectionNight else PreferKey.coverCollectionDay
+        val key = if (isNight) collectionNightKey else collectionDayKey
         val id = appCtx.getPrefString(key)?.takeIf { it.isNotBlank() } ?: return@withContext null
         val collection = loadIndex(isNight).firstOrNull { it.id == id } ?: return@withContext null
         Entry(collection, Source.LOCAL, collectionDir(collection))
@@ -325,12 +328,12 @@ object CoverCollectionManager {
     private fun selectedCollectionCover(bookKey: String, hasOriginalCover: Boolean): String? {
         val isNight = AppConfig.isNightTheme
         val collectionId = appCtx.getPrefString(
-            if (isNight) PreferKey.coverCollectionNight else PreferKey.coverCollectionDay
+            if (isNight) collectionNightKey else collectionDayKey
         ) ?: return null
         val collection = loadIndex(isNight).firstOrNull { it.id == collectionId } ?: return null
         if (collection.images.isEmpty()) return null
         val mode = appCtx.getPrefString(
-            if (isNight) PreferKey.coverCollectionModeNight else PreferKey.coverCollectionModeDay,
+            if (isNight) collectionModeNightKey else collectionModeDayKey,
             MODE_RANDOM
         ) ?: MODE_RANDOM
         if (mode == MODE_MIXED && hasOriginalCover) {
@@ -344,7 +347,7 @@ object CoverCollectionManager {
     }
 
     fun setSelected(isNight: Boolean, collectionId: String?) {
-        val key = if (isNight) PreferKey.coverCollectionNight else PreferKey.coverCollectionDay
+        val key = if (isNight) collectionNightKey else collectionDayKey
         appCtx.putPrefString(key, collectionId.orEmpty())
     }
 
@@ -590,7 +593,7 @@ object CoverCollectionManager {
     }
 
     private fun clearSelectedIfNeeded(collection: Collection) {
-        val key = if (collection.isNight) PreferKey.coverCollectionNight else PreferKey.coverCollectionDay
+        val key = if (collection.isNight) collectionNightKey else collectionDayKey
         if (appCtx.getPrefString(key) == collection.id) {
             appCtx.putPrefString(key, "")
         }
