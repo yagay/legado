@@ -218,12 +218,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val composeSuiteWidgetBooks = mutableStateMapOf<String, List<SearchBook>>()
     private val composeSuiteRankedWidgetBooks = mutableStateMapOf<String, Map<String, List<SearchBook>>>()
     private val composeSuiteLoadingWidgets = mutableStateMapOf<String, Boolean>()
-    private val suiteWidgetSignatures = hashMapOf<String, String>()
-    private val suiteRandomDecks = hashMapOf<String, SuiteRandomDeck>()
-    private val suitePreparedRandomBatches = hashMapOf<String, SuitePreparedBatch>()
-    private val suiteRandomPrepareJobs = hashMapOf<String, Job>()
-    private val suiteHorizontalPagingStates = hashMapOf<String, SuiteHorizontalPagingState>()
-    private val suiteRankedPagingStates = hashMapOf<String, SuiteRankedPagingState>()
+    private val suiteRuntime = ModernDiscoverySuiteRuntime()
     private val suiteWidgetLoadSemaphore = Semaphore(SUITE_WIDGET_LOAD_PARALLELISM)
     private val suiteTargetLoadSemaphore = Semaphore(SUITE_TARGET_LOAD_PARALLELISM)
     private val suiteCoverPreloadSemaphore = Semaphore(SUITE_COVER_PRELOAD_PARALLELISM)
@@ -523,15 +518,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         composeSuiteLoadingWidgets.clear()
         composeSuiteWidgetBooks.clear()
         composeSuiteRankedWidgetBooks.clear()
-        suiteWidgetSignatures.clear()
-        synchronized(suiteRandomDecks) {
-            suiteRandomDecks.clear()
-        }
-        suitePreparedRandomBatches.clear()
-        suiteRandomPrepareJobs.values.forEach { it.cancel() }
-        suiteRandomPrepareJobs.clear()
-        suiteHorizontalPagingStates.clear()
-        suiteRankedPagingStates.clear()
+        suiteRuntime.clear()
         composeSuiteCanScrollBackward = false
     }
 
@@ -568,7 +555,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val suite = selectedSuite() ?: run {
             composeSuiteWidgetBooks.clear()
             composeSuiteRankedWidgetBooks.clear()
-            suiteWidgetSignatures.clear()
+            suiteRuntime.widgetSignatures.clear()
             return
         }
         val widgetIds = suite.widgets.map { it.id }.toSet()
@@ -578,36 +565,17 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         composeSuiteRankedWidgetBooks.keys
             .filterNot { it in widgetIds }
             .forEach { composeSuiteRankedWidgetBooks.remove(it) }
-        suiteWidgetSignatures.keys
-            .filterNot { it in widgetIds }
-            .forEach { suiteWidgetSignatures.remove(it) }
-        synchronized(suiteRandomDecks) {
-            suiteRandomDecks.keys
-                .filterNot { it in widgetIds }
-                .forEach { suiteRandomDecks.remove(it) }
-        }
-        suitePreparedRandomBatches.keys
-            .filterNot { it in widgetIds }
-            .forEach { suitePreparedRandomBatches.remove(it) }
-        suiteRandomPrepareJobs.keys
-            .filterNot { it in widgetIds }
-            .forEach { suiteRandomPrepareJobs.remove(it)?.cancel() }
-        suiteHorizontalPagingStates.keys
-            .filterNot { it in widgetIds }
-            .forEach { suiteHorizontalPagingStates.remove(it) }
-        suiteRankedPagingStates.keys
-            .filterNot { key -> key.substringBefore('\n') in widgetIds }
-            .forEach { suiteRankedPagingStates.remove(it) }
+        suiteRuntime.retainWidgets(widgetIds)
         val widgetsToLoad = suite.widgets.filterNot { widget ->
             val signature = widget.cacheSignature()
             when {
                 widget.isSuiteButtonOnlyWidget() || widget.targets.isEmpty() -> {
                     composeSuiteWidgetBooks[widget.id] = emptyList()
                     composeSuiteRankedWidgetBooks.remove(widget.id)
-                    suiteWidgetSignatures[widget.id] = signature
+                    suiteRuntime.widgetSignatures[widget.id] = signature
                     true
                 }
-                suiteWidgetSignatures[widget.id] == signature &&
+                suiteRuntime.widgetSignatures[widget.id] == signature &&
                     composeSuiteWidgetBooks.containsKey(widget.id) &&
                     (widget.type != DiscoverySuiteWidgetType.RankedList.value ||
                         composeSuiteRankedWidgetBooks.containsKey(widget.id)) -> {
@@ -635,7 +603,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 if (widget.isSuiteButtonOnlyWidget() || widget.targets.isEmpty()) {
                     composeSuiteWidgetBooks[widget.id] = emptyList()
                     composeSuiteRankedWidgetBooks.remove(widget.id)
-                    suiteWidgetSignatures[widget.id] = widget.cacheSignature()
+                    suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
                     return@withPermit
                 }
                 composeSuiteLoadingWidgets[widget.id] = true
@@ -654,7 +622,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     }
                     composeSuiteRankedWidgetBooks[widget.id] = rankedBooks
                     composeSuiteWidgetBooks[widget.id] = rankedBooks.values.flatten()
-                    suiteWidgetSignatures[widget.id] = widget.cacheSignature()
+                    suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
                     composeSuiteLoadingWidgets[widget.id] = false
                     prefetchSuiteCovers(rankedBooks.values.flatten())
                     return@withPermit
@@ -673,7 +641,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     return@async
                 }
                 composeSuiteWidgetBooks[widget.id] = books
-                suiteWidgetSignatures[widget.id] = widget.cacheSignature()
+                suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
                 composeSuiteLoadingWidgets[widget.id] = false
                 prefetchSuiteCovers(books)
                 if (widget.type == DiscoverySuiteWidgetType.HorizontalBooks.value) {
@@ -723,8 +691,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         composeSuiteWidgetBooks.putAll(snapshot.widgetBooks)
         composeSuiteRankedWidgetBooks.clear()
         composeSuiteRankedWidgetBooks.putAll(snapshot.rankedWidgetBooks)
-        suiteWidgetSignatures.clear()
-        suiteWidgetSignatures.putAll(snapshot.widgetSignatures)
+        suiteRuntime.widgetSignatures.clear()
+        suiteRuntime.widgetSignatures.putAll(snapshot.widgetSignatures)
         prefetchSuiteCovers(snapshot.widgetBooks.values.flatten())
     }
 
@@ -748,7 +716,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                         .mapValues { entry -> entry.value.take(RANKED_SUITE_SNAPSHOT_BOOK_LIMIT) }
                 }
                 .filterValues { it.isNotEmpty() },
-            widgetSignatures = suiteWidgetSignatures.filterKeys { key ->
+            widgetSignatures = suiteRuntime.widgetSignatures.filterKeys { key ->
                 snapshotWidgets.any { it.id == key }
             }
         )
@@ -763,7 +731,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             DiscoverySuiteWidgetType.WaterfallBooks.value -> WATERFALL_SUITE_BOOK_COUNT
             else -> RANDOM_SUITE_BOOK_COUNT
         }
-        val deck = suiteRandomDeck(widget)
+        val deck = suiteRuntime.randomDeck(widget)
         val books = deck.mutex.withLock {
             if (deck.queue.size < bookCount) {
                 fillSuiteRandomDeckLocked(
@@ -791,7 +759,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private suspend fun loadSuiteHorizontalWidgetBooks(widget: DiscoverySuiteWidget): List<SearchBook> {
-        val state = suiteHorizontalPagingState(widget)
+        val state = suiteRuntime.horizontalPagingState(widget)
         state.nextPage = 2
         state.exhausted = false
         val target = widget.validRandomTargets().firstOrNull() ?: return emptyList()
@@ -828,7 +796,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 .awaitAll()
         }
         entries.forEach { (target, books) ->
-            val state = suiteRankedPagingState(widget, target)
+            val state = suiteRuntime.rankedPagingState(widget, target)
             state.nextPage = 2
             state.exhausted = books.isEmpty()
             result[target.deckKey()] = books
@@ -931,7 +899,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             widget.type == DiscoverySuiteWidgetType.RankedList.value ||
             widget.type == DiscoverySuiteWidgetType.WaterfallBooks.value
         ) return
-        val deck = suiteRandomDeck(widget)
+        val deck = suiteRuntime.randomDeck(widget)
         if (deck.prefetching || deck.queue.size >= RANDOM_SUITE_BOOK_COUNT) return
         viewLifecycleOwner.lifecycleScope.launch(IO) {
             deck.prefetching = true
@@ -949,27 +917,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 AppLog.put("套件发现控件预加载失败", e)
             } finally {
                 deck.prefetching = false
-            }
-        }
-    }
-
-    private fun suiteRandomDeck(widget: DiscoverySuiteWidget): SuiteRandomDeck {
-        val signature = widget.deckSignature()
-        return synchronized(suiteRandomDecks) {
-            val current = suiteRandomDecks[widget.id]
-            if (current != null && current.signature == signature) {
-                return@synchronized current
-            }
-            val targets = widget.validRandomTargets()
-            SuiteRandomDeck(
-                signature = signature,
-                targetIndex = if (targets.isEmpty()) {
-                    0
-                } else {
-                    Random(System.nanoTime()).nextInt(targets.size)
-                }
-            ).also {
-                suiteRandomDecks[widget.id] = it
             }
         }
     }
@@ -993,7 +940,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 if (rankedBooks.isNotEmpty()) {
                     composeSuiteRankedWidgetBooks[widget.id] = rankedBooks
                     composeSuiteWidgetBooks[widget.id] = rankedBooks.values.flatten()
-                    suiteWidgetSignatures[widget.id] = widget.cacheSignature()
+                    suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
                     prefetchSuiteCovers(rankedBooks.values.flatten())
                     saveCurrentSuiteSnapshot()
                 }
@@ -1005,11 +952,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         }
         if (widget.type != DiscoverySuiteWidgetType.HorizontalBooks.value) {
             val signature = widget.deckSignature()
-            val prepared = suitePreparedRandomBatches.remove(widget.id)
+            val prepared = suiteRuntime.preparedRandomBatches.remove(widget.id)
                 ?.takeIf { it.signature == signature }
             if (prepared != null) {
                 composeSuiteWidgetBooks[widget.id] = prepared.books
-                suiteWidgetSignatures[widget.id] = widget.cacheSignature()
+                suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
                 prefetchSuiteCovers(prepared.books)
                 saveCurrentSuiteSnapshot()
                 prepareSuiteNextRandomBatch(widget)
@@ -1030,7 +977,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             if (!isCurrentSuiteWidget(widget)) return@launch
             if (books.isNotEmpty()) {
                 composeSuiteWidgetBooks[widget.id] = books
-                suiteWidgetSignatures[widget.id] = widget.cacheSignature()
+                suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
                 prefetchSuiteCovers(books)
                 saveCurrentSuiteSnapshot()
             }
@@ -1053,11 +1000,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             widget.type == DiscoverySuiteWidgetType.WaterfallBooks.value
         ) return
         val signature = widget.deckSignature()
-        if (suitePreparedRandomBatches[widget.id]?.signature == signature) return
-        val runningJob = suiteRandomPrepareJobs[widget.id]
+        if (suiteRuntime.preparedRandomBatches[widget.id]?.signature == signature) return
+        val runningJob = suiteRuntime.randomPrepareJobs[widget.id]
         if (runningJob?.isActive == true) return
         val appContext = requireContext().applicationContext
-        suiteRandomPrepareJobs[widget.id] = viewLifecycleOwner.lifecycleScope.launch {
+        suiteRuntime.randomPrepareJobs[widget.id] = viewLifecycleOwner.lifecycleScope.launch {
             try {
             val books = try {
                 withContext(IO) {
@@ -1073,19 +1020,19 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             }
             if (!isCurrentSuiteWidget(widget)) return@launch
             if (books.isNotEmpty() && widget.deckSignature() == signature) {
-                suitePreparedRandomBatches[widget.id] = SuitePreparedBatch(signature, books)
+                suiteRuntime.preparedRandomBatches[widget.id] = SuitePreparedBatch(signature, books)
                 prefetchSuiteCovers(books)
             }
             prefetchSuiteWidgetDeck(widget)
             } finally {
-                suiteRandomPrepareJobs.remove(widget.id)
+                suiteRuntime.randomPrepareJobs.remove(widget.id)
             }
         }
     }
 
     private fun loadMoreSuiteHorizontalWidget(widget: DiscoverySuiteWidget) {
         if (!usingSuiteDiscovery || widget.type != DiscoverySuiteWidgetType.HorizontalBooks.value) return
-        val state = suiteHorizontalPagingState(widget)
+        val state = suiteRuntime.horizontalPagingState(widget)
         if (state.loading || state.exhausted) return
         val currentBooks = composeSuiteWidgetBooks[widget.id].orEmpty()
         if (currentBooks.size >= HORIZONTAL_SUITE_MAX_BOOKS) {
@@ -1108,7 +1055,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 state.loading = false
                 return@launch
             }
-            val latestState = suiteHorizontalPagingState(widget)
+            val latestState = suiteRuntime.horizontalPagingState(widget)
             if (latestState.signature != state.signature) {
                 state.loading = false
                 return@launch
@@ -1119,7 +1066,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 .take(HORIZONTAL_SUITE_MAX_BOOKS)
             if (merged.size > current.size) {
                 composeSuiteWidgetBooks[widget.id] = merged
-                suiteWidgetSignatures[widget.id] = widget.cacheSignature()
+                suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
                 prefetchSuiteCovers(books)
                 latestState.nextPage = page + 1
                 latestState.exhausted = merged.size >= HORIZONTAL_SUITE_MAX_BOOKS
@@ -1140,7 +1087,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     ) {
         if (!usingSuiteDiscovery || widget.type != DiscoverySuiteWidgetType.RankedList.value) return
         if (target.sourceUrl.isBlank() || target.tagUrl.isBlank()) return
-        val state = suiteRankedPagingState(widget, target)
+        val state = suiteRuntime.rankedPagingState(widget, target)
         if (state.loading || state.exhausted) return
         val page = state.nextPage
         state.loading = true
@@ -1158,7 +1105,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 state.loading = false
                 return@launch
             }
-            val latestState = suiteRankedPagingState(widget, target)
+            val latestState = suiteRuntime.rankedPagingState(widget, target)
             if (latestState.signature != state.signature) {
                 state.loading = false
                 return@launch
@@ -1173,7 +1120,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 }
                 composeSuiteRankedWidgetBooks[widget.id] = mergedMap
                 composeSuiteWidgetBooks[widget.id] = mergedMap.values.flatten()
-                suiteWidgetSignatures[widget.id] = widget.cacheSignature()
+                suiteRuntime.widgetSignatures[widget.id] = widget.cacheSignature()
                 prefetchSuiteCovers(books)
                 latestState.nextPage = page + 1
                 latestState.exhausted = books.isEmpty()
@@ -1214,32 +1161,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             ModernDiscoveryDataRepository.persistSearchBooks(books)
         }
         return books
-    }
-
-    private fun suiteHorizontalPagingState(widget: DiscoverySuiteWidget): SuiteHorizontalPagingState {
-        val signature = widget.horizontalPagingSignature()
-        return synchronized(suiteHorizontalPagingStates) {
-            suiteHorizontalPagingStates[widget.id]
-                ?.takeIf { it.signature == signature }
-                ?: SuiteHorizontalPagingState(signature = signature).also {
-                    suiteHorizontalPagingStates[widget.id] = it
-                }
-        }
-    }
-
-    private fun suiteRankedPagingState(
-        widget: DiscoverySuiteWidget,
-        target: DiscoverySuiteWidgetTarget
-    ): SuiteRankedPagingState {
-        val key = widget.rankedPagingKey(target)
-        val signature = widget.rankedPagingSignature(target)
-        return synchronized(suiteRankedPagingStates) {
-            suiteRankedPagingStates[key]
-                ?.takeIf { it.signature == signature }
-                ?: SuiteRankedPagingState(signature = signature).also {
-                    suiteRankedPagingStates[key] = it
-                }
-        }
     }
 
     private fun prefetchSuiteCovers(books: List<SearchBook>) {
