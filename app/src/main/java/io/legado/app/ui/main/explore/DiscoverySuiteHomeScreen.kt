@@ -61,9 +61,7 @@ import android.content.Context
 import io.legado.app.R
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.config.AppConfig
-import io.legado.app.lib.theme.UiCorner
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListRenderConfig
-import io.legado.app.ui.main.bookshelf.compose.rememberBookshelfListRenderConfig
 import io.legado.app.ui.widget.compose.AppManagementMenuAction
 import io.legado.app.ui.widget.compose.AppManagementMoreActionButton
 import io.legado.app.ui.widget.compose.BookCoverImage
@@ -102,11 +100,7 @@ fun DiscoverySuiteHomeScreen(
 ) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
-    val baseRenderConfig = rememberBookshelfListRenderConfig()
-    val opacityMultiplier = selectedSuite?.opacityMultiplier ?: 1f
-    val renderConfig = remember(context, baseRenderConfig, opacityMultiplier) {
-        baseRenderConfig.withSuiteOpacityMultiplier(context, opacityMultiplier)
-    }
+    val renderConfig = rememberDiscoveryDefaultRenderConfig()
     val bottomBarPadding = with(LocalDensity.current) {
         context.resources.getDimensionPixelSize(R.dimen.main_content_bottom_bar_padding).toDp()
     }
@@ -1268,33 +1262,6 @@ private fun SearchBook.suiteStableKey(): String {
         author.isNotBlank() -> "$origin|$name|$author"
         else -> "$origin|$name"
     }
-}
-
-private fun BookshelfListRenderConfig.withSuiteOpacityMultiplier(
-    context: Context,
-    multiplier: Float
-): BookshelfListRenderConfig {
-    val safeMultiplier = multiplier.coerceIn(1f, 4f)
-    if (safeMultiplier <= 1.001f) return this
-    return copy(
-        palette = palette.copy(
-            rowColor = palette.rowColor.withAlphaMultiplier(safeMultiplier),
-            rowPressedColor = palette.rowPressedColor.withAlphaMultiplier(safeMultiplier),
-            borderColor = palette.borderColor?.withAlphaMultiplier(safeMultiplier)
-        ),
-        panelImage = UiCorner.panelImageDrawable(
-            context = context,
-            radius = palette.panelRadiusPx,
-            alphaMultiplier = safeMultiplier
-        )
-    )
-}
-
-private fun Int.withAlphaMultiplier(multiplier: Float): Int {
-    val alpha = android.graphics.Color.alpha(this)
-    if (alpha >= 255) return this
-    val nextAlpha = (alpha * multiplier).roundToInt().coerceIn(alpha, 255)
-    return (this and 0x00ffffff) or (nextAlpha shl 24)
 }
 
 private const val RANDOM_WIDGET_DISPLAY_COUNT = 6
