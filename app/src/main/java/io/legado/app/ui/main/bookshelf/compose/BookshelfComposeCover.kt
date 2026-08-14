@@ -7,6 +7,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.CoverDisplayConfig
 import io.legado.app.help.config.CoverCollectionManager
 import io.legado.app.help.config.CoverCollectionManager.isRealCoverPath
 import io.legado.app.ui.widget.compose.BookCoverImage
@@ -116,7 +117,7 @@ private fun buildCoverRequest(
 private fun BookshelfItemUi.coverIdentityKey(): String {
     val configKey = listOf(
         AppConfig.useDefaultCover.toString(),
-        AppConfig.loadCoverHighQuality.toString(),
+        CoverDisplayConfig.loadHighQuality.toString(),
         CoverCollectionManager.selectionKey()
     ).joinToString("|")
     return when (this) {
