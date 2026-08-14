@@ -161,7 +161,7 @@ fun Context.themeUiSignature(): String {
         "searchFollow=${ThemeShapeConfig.searchFollowsCorner}",
         "replyFollow=${ThemeShapeConfig.replyFollowsCorner}",
         "layoutAlpha=${ThemeShapeConfig.layoutAlpha}",
-        "dialogAlpha=${AppConfig.dialogAlpha}",
+        "dialogAlpha=${DialogDisplayConfig.alpha}",
         "cardShadow=${getPrefInt(ThemeRuntimeKeys.themeCardShadow(), -1)}",
         "cardBackgroundBlur=${getPrefInt(ThemeRuntimeKeys.themeCardBackgroundBlur(), -1)}",
         "bookCoverShadow=${CoverDisplayConfig.shadowEnabled}",
