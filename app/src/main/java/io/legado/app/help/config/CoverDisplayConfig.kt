@@ -12,7 +12,7 @@ import splitties.init.appCtx
 object CoverDisplayConfig {
 
     private const val LOAD_HIGH_QUALITY_KEY = "loadCoverHighQuality"
-    private const val COVER_SHADOW_KEY = "bookCoverShadow"
+    const val COVER_SHADOW_KEY = "bookCoverShadow"
 
     var loadHighQuality: Boolean
         get() = appCtx.getPrefBoolean(LOAD_HIGH_QUALITY_KEY, false)
