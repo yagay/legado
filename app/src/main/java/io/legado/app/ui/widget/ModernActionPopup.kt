@@ -60,6 +60,7 @@ import io.legado.app.lib.theme.UiCorner
 import io.legado.app.ui.widget.compose.LegadoMiuixChoiceRow
 import io.legado.app.ui.widget.compose.installViewTreeOwnersFrom
 import io.legado.app.ui.widget.compose.rememberAppDialogStyle
+import io.legado.app.ui.widget.compose.rememberDefaultAppDialogStyle
 import io.legado.app.ui.widget.compose.toMiuixPalette
 import io.legado.app.utils.activity
 import io.legado.app.utils.dpToPx
@@ -520,7 +521,11 @@ object ModernActionPopup {
         onDismiss: () -> Unit,
         upstreamMenuStyle: Boolean = false
     ) {
-        val style = rememberAppDialogStyle()
+        val style = if (upstreamMenuStyle) {
+            rememberDefaultAppDialogStyle()
+        } else {
+            rememberAppDialogStyle()
+        }
         val palette = style.toMiuixPalette()
         val menuPalette = if (upstreamMenuStyle) {
             palette.copy(surfaceVariant = style.surface)
