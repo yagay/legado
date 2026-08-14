@@ -36,16 +36,4 @@
     <dimen name="fastscroll_scrollbar_padding_end">8dp</dimen>
 
     <dimen name="fixed_height_bottom_padding">8dp</dimen>
-    <dimen name="main_content_bottom_bar_padding">90dp</dimen>
-    <dimen name="bookshelf_tag_bar_margin_horizontal">16dp</dimen>
-    <dimen name="bookshelf_action_button_size">34dp</dimen>
-    <dimen name="bookshelf_action_button_padding">8dp</dimen>
-    <dimen name="bookshelf_title_row_margin_top">8dp</dimen>
-    <dimen name="bookshelf_title_select_height">42dp</dimen>
-    <dimen name="bookshelf_title_arrow_size">18dp</dimen>
-    <dimen name="bookshelf_tag_bar_height">38dp</dimen>
-    <dimen name="bookshelf_tag_bar_margin_top">8dp</dimen>
-    <dimen name="top_bar_regular_action_size">36dp</dimen>
-    <dimen name="ui_panel_radius">10dp</dimen>
-    <dimen name="ui_action_radius">9dp</dimen>
 </resources>
