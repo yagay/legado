@@ -38,6 +38,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect as ComposeRect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -57,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.UiCorner
+import io.legado.app.lib.theme.configuredPrimaryTextColor
+import io.legado.app.lib.theme.configuredSecondaryTextColor
 import io.legado.app.ui.widget.compose.LegadoMiuixChoiceRow
 import io.legado.app.ui.widget.compose.installViewTreeOwnersFrom
 import io.legado.app.ui.widget.compose.rememberAppDialogStyle
@@ -521,10 +524,19 @@ object ModernActionPopup {
         onDismiss: () -> Unit,
         upstreamMenuStyle: Boolean = false
     ) {
-        val style = if (upstreamMenuStyle) {
+        val context = LocalContext.current
+        val baseStyle = if (upstreamMenuStyle) {
             rememberDefaultAppDialogStyle()
         } else {
             rememberAppDialogStyle()
+        }
+        val style = if (upstreamMenuStyle) {
+            baseStyle.copy(
+                primaryText = Color(context.configuredPrimaryTextColor),
+                secondaryText = Color(context.configuredSecondaryTextColor)
+            )
+        } else {
+            baseStyle
         }
         val palette = style.toMiuixPalette()
         val menuPalette = if (upstreamMenuStyle) {
@@ -535,7 +547,6 @@ object ModernActionPopup {
         val panelShape = RoundedCornerShape(
             if (upstreamMenuStyle) 12.dp else style.panelRadius
         )
-        val context = LocalContext.current
         // 上游 PopupAction 使用无描边的 shape_card_view；其他现代菜单保留主题面板边框。
         val hasPanelBorder = !upstreamMenuStyle && UiCorner.panelBorderColor(context) != null
         // 跟踪 persistent 项的 checked 状态
