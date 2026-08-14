@@ -31,6 +31,7 @@ import androidx.lifecycle.Lifecycle
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.help.book.BookTagHelper
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.BookshelfDisplayConfig
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.rememberThemeUiPalette
 import io.legado.app.lib.theme.titleTypeface
@@ -68,8 +69,8 @@ fun buildBookshelfItems(
     groupId: Long,
     isUpdating: (String) -> Boolean
 ): List<BookshelfItemUi> {
-    val configuredTags = AppConfig.bookshelfGroupTags[groupId].orEmpty()
-    val hiddenTags = AppConfig.bookshelfHiddenTags[groupId].orEmpty()
+    val configuredTags = BookshelfDisplayConfig.groupTags[groupId].orEmpty()
+    val hiddenTags = BookshelfDisplayConfig.hiddenTags[groupId].orEmpty()
     val bookItems = books.map { book ->
         BookshelfBookItemUi(
             display = book,
