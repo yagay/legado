@@ -203,11 +203,11 @@ class MainTopBarView @JvmOverloads constructor(
     fun setMode(mode: Mode) {
         this.mode = mode
         moreButton.isVisible = mode == Mode.BOOKSHELF || mode == Mode.READ_RECORD
-        searchButton.isVisible = usesUpstreamTitleBarStyle() || mode == Mode.RSS
-        filterButton.isVisible = usesUpstreamTitleBarStyle()
+        searchButton.isVisible = mode == Mode.DISCOVERY || mode == Mode.RSS
+        filterButton.isVisible = mode == Mode.DISCOVERY
         starButton.isVisible = mode == Mode.RSS
         refreshButton.isVisible = mode == Mode.RSS
-        loginButton.isVisible = usesUpstreamTitleBarStyle() || mode == Mode.RSS
+        loginButton.isVisible = mode == Mode.DISCOVERY || mode == Mode.RSS
         titleText.textSize = if (mode == Mode.BOOKSHELF) 24f else 20f
         titleText.applyUiTitleTypeface(context)
         applyTopBarStyle(force = true)
@@ -683,7 +683,7 @@ class MainTopBarView @JvmOverloads constructor(
         tagsBar.setBackgroundOverrideColor(null)
         primaryBar.setSelectedBackgroundVisible(true)
         selectsBar.setSelectedBackgroundVisible(true)
-        tagsBar.setSelectedBackgroundVisible(usesUpstreamTitleBarStyle())
+        tagsBar.setSelectedBackgroundVisible(mode == Mode.DISCOVERY)
     }
 
     private fun buildTitleRow(): LinearLayout {
