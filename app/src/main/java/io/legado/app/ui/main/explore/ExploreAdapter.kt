@@ -39,7 +39,7 @@ import io.legado.app.help.source.exploreKinds
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.login.SourceLoginJsExtensions
-import io.legado.app.ui.widget.ModernActionPopup
+import io.legado.app.ui.widget.popupActionMenu
 import io.legado.app.ui.widget.dialog.TextDialog
 import io.legado.app.ui.widget.text.AccentTextView
 import io.legado.app.utils.InfoMap
@@ -63,18 +63,29 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.set
 import kotlin.text.isNullOrEmpty
 
+internal fun isExploreBindingCurrent(
+    expectedLoadVersion: Int,
+    currentLoadVersion: Int,
+    expandedPosition: Int,
+    bindingPosition: Int,
+    boundSourceUrl: String,
+    currentSourceUrl: String?,
+): Boolean = expectedLoadVersion == currentLoadVersion &&
+    expandedPosition == bindingPosition &&
+    boundSourceUrl == currentSourceUrl
+
 class ExploreAdapter(context: Context, val callBack: CallBack) :
     RecyclerAdapter<BookSourcePart, ItemFindBookBinding>(context) {
     companion object {
         val exploreInfoMapList = LruCache<String, InfoMap>(99)
     }
-    private var modernMenuPopup: ModernActionPopup.Handle? = null
     private val recycler = arrayListOf<TextView>()
     private val textRecycler = arrayListOf<AutoCompleteTextView>()
     private val selectRecycler = arrayListOf<LinearLayout>()
 
     private var exIndex = -1
     private var scrollTo = -1
+    private var kindLoadVersion = 0
     private var lastClickTime: Long = 0
     private val sourceKinds = ConcurrentHashMap<String, List<ExploreKind>>()
     private var saveInfoMapJob: Job? = null
@@ -99,14 +110,34 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                 tvName.text = item.bookSourceName
             }
             if (exIndex == holder.layoutPosition) {
+                val loadVersion = ++kindLoadVersion
+                fun currentBindingPosition(): Int? {
+                    val position = holder.bindingAdapterPosition
+                    return position.takeIf {
+                        isExploreBindingCurrent(
+                            expectedLoadVersion = loadVersion,
+                            currentLoadVersion = kindLoadVersion,
+                            expandedPosition = exIndex,
+                            bindingPosition = position,
+                            boundSourceUrl = item.bookSourceUrl,
+                            currentSourceUrl = getItem(position)?.bookSourceUrl,
+                        )
+                    }
+                }
                 ivStatus.setImageResource(R.drawable.ic_arrow_down)
                 rotateLoading.loadingColor = context.accentColor
                 rotateLoading.visible()
+                recyclerFlexbox(flexbox)
+                flexbox.gone()
                 Coroutine.async(callBack.scope) {
                     loadExploreKinds(item)
                 }.onSuccess { kindList ->
-                    upKindList(this@run, item, kindList, exIndex)
+                    currentBindingPosition()?.let { position ->
+                        sourceKinds[item.bookSourceUrl] = kindList
+                        upKindList(this@run, item, kindList, position)
+                    }
                 }.onFinally {
+                    if (currentBindingPosition() == null) return@onFinally
                     rotateLoading.gone()
                     if (scrollTo >= 0) {
                         callBack.scrollTo(scrollTo)
@@ -124,13 +155,14 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
 
     @SuppressLint("SetTextI18n", "ClickableViewAccessibility")
     private fun upKindList(binding: ItemFindBookBinding, item: BookSourcePart, kinds: List<ExploreKind>, exIndex: Int) {
+        val flexbox = binding.flexbox
+        recyclerFlexbox(flexbox)
+        flexbox.gone()
         if (kinds.isEmpty()) {
             return
         }
-        val flexbox = binding.flexbox
         val sourceUrl = item.bookSourceUrl
         kotlin.runCatching {
-            recyclerFlexbox(flexbox)
             flexbox.visible()
             val source by lazy { appDb.bookSourceDao.getBookSource(sourceUrl) }
             val infoMap by lazy {
@@ -663,32 +695,29 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
 
     private fun showMenu(binding: ItemFindBookBinding, position: Int): Boolean {
         val source = getItem(position) ?: return true
-        val actions = buildList {
-            add(ModernActionPopup.Action(context.getString(R.string.edit)) {
-                callBack.editSource(source.bookSourceUrl)
-            })
-            add(ModernActionPopup.Action(context.getString(R.string.to_top)) {
-                callBack.toTop(source)
-            })
-            if (source.hasLoginUrl) {
-                add(ModernActionPopup.Action(context.getString(R.string.login)) {
-                    context.startActivity<SourceLoginActivity> {
-                        putExtra("type", "bookSource")
-                        putExtra("key", source.bookSourceUrl)
-                    }
-                })
+        popupActionMenu(context) {
+            item(context.getString(R.string.edit), "edit")
+            item(context.getString(R.string.to_top), "top")
+            item(context.getString(R.string.login), "login", source.hasLoginUrl)
+            item(context.getString(R.string.search), "search")
+            item(context.getString(R.string.refresh), "refresh")
+            item(context.getString(R.string.delete), "delete")
+            danger("delete")
+        }.show(binding.llTitle) { action ->
+            when (action) {
+                "edit" -> callBack.editSource(source.bookSourceUrl)
+                "top" -> callBack.toTop(source)
+                "search" -> callBack.searchBook(source)
+                "login" -> context.startActivity<SourceLoginActivity> {
+                    putExtra("type", "bookSource")
+                    putExtra("key", source.bookSourceUrl)
+                }
+
+                "refresh" -> refreshExplore(source, position, binding)
+
+                "delete" -> callBack.deleteSource(source)
             }
-            add(ModernActionPopup.Action(context.getString(R.string.search)) {
-                callBack.searchBook(source)
-            })
-            add(ModernActionPopup.Action(context.getString(R.string.refresh)) {
-                refreshExplore(source, position, binding)
-            })
-            add(ModernActionPopup.Action(context.getString(R.string.delete)) {
-                callBack.deleteSource(source)
-            })
         }
-        modernMenuPopup = ModernActionPopup.show(binding.llTitle, actions, modernMenuPopup)
         return true
     }
 
