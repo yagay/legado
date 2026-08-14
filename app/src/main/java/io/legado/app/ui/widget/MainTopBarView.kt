@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.text.TextUtils
 import android.util.AttributeSet
@@ -35,6 +36,7 @@ import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.applyUiTitleTypeface
 import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.lib.theme.getToolbarTextColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
@@ -45,6 +47,7 @@ import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.ui.widget.compose.ComposeThemeImageLayer
 import io.legado.app.ui.widget.compose.ComposeThemeImageCrop
 import io.legado.app.ui.widget.compose.ComposeThemeImageState
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.ImageTypeUtils
 import io.legado.app.utils.StatusBarInsetAware
 import io.legado.app.utils.StringUtils
@@ -394,12 +397,22 @@ class MainTopBarView @JvmOverloads constructor(
             maxLines = 1
             typeface = context.uiTypeface()
             isSelected = optionIndex == row.selectedIndex
-            setTextColor(if (isSelected) context.accentColor else context.primaryTextColor)
-            background = UiCorner.actionSelector(
-                Color.TRANSPARENT,
-                TopBarConfig.withOpacity(context.accentColor, 16),
-                UiCorner.actionRadius(context)
+            val accent = context.accentColor
+            setTextColor(
+                if (isSelected) {
+                    context.getPrimaryTextColor(ColorUtils.isColorLight(accent))
+                } else {
+                    context.primaryTextColor
+                }
             )
+            background = if (isSelected) {
+                GradientDrawable().apply {
+                    cornerRadius = 2.dp.toFloat()
+                    setColor(accent)
+                }
+            } else {
+                ColorDrawable(Color.TRANSPARENT)
+            }
             setPadding(12.dp, 0, 12.dp, 0)
             setOnClickListener { onOptionClick(rowIndex, optionIndex) }
         }
