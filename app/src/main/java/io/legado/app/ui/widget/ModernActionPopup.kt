@@ -528,7 +528,7 @@ object ModernActionPopup {
             palette
         }
         val panelShape = RoundedCornerShape(
-            if (upstreamMenuStyle) 3.dp else style.panelRadius
+            if (upstreamMenuStyle) 12.dp else style.panelRadius
         )
         val context = LocalContext.current
         // 上游 PopupAction 使用无描边的 shape_card_view；其他现代菜单保留主题面板边框。
