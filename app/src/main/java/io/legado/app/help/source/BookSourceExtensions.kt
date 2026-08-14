@@ -29,24 +29,7 @@ private val exploreKindsMap by lazy { ConcurrentHashMap<String, List<ExploreKind
 private val aCache by lazy { ACache.get("explore") }
 
 private fun BookSource.getExploreKindsKey(): String {
-    // 与上游(如 Rimchars)保持一致:key 包含书源更新时间、JS库与源状态,
-    // 书源更新后缓存自动失效并重新解析分类,无需手动刷新。
-    val sourceState = listOf(
-        MD5Utils.md5Encode16(getVariable()),
-        get("type"),
-        get("order"),
-        get("hostIndex"),
-        get("host")
-    ).joinToString("|")
-    return MD5Utils.md5Encode(
-        listOf(
-            bookSourceUrl,
-            exploreUrl.orEmpty(),
-            jsLib.orEmpty(),
-            lastUpdateTime.toString(),
-            sourceState
-        ).joinToString("\n")
-    )
+    return MD5Utils.md5Encode(bookSourceUrl + exploreUrl)
 }
 
 private fun BookSourcePart.getExploreKindsKey(): String {
@@ -116,11 +99,7 @@ suspend fun BookSource.exploreKinds(): List<ExploreKind> {
                 it.printOnDebug()
             }
         }
-        // 空结果不写入内存缓存:脚本瞬时失败(返回空/null/undefined)时
-        // 下次调用仍会重新解析,避免分类被锁死为空直到手动刷新。
-        if (kinds.isNotEmpty()) {
-            exploreKindsMap[exploreKindsKey] = kinds
-        }
+        exploreKindsMap[exploreKindsKey] = kinds
         return kinds
     }
 }
