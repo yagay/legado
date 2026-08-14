@@ -23,6 +23,7 @@ fun ComposeLazyListFastScroller(
     state: LazyListState,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    side: ScrollbarLayoutSide = ScrollbarLayoutSide.End,
     minThumbHeight: Dp = 44.dp,
     touchTargetWidth: Dp = AppConfig.fastScrollerTouchTargetDp.dp,
     dragHotZoneWidth: Dp = touchTargetWidth
@@ -31,6 +32,7 @@ fun ComposeLazyListFastScroller(
     val visibleItems = state.layoutInfo.visibleItemsInfo.size
     if (!enabled || totalItems <= visibleItems || visibleItems <= 0 || totalItems <= 0) return
     val settings = rememberLegadoScrollbarSettings(
+        side = side,
         minThumbHeight = minThumbHeight,
         viewportMainAxisPx = state.layoutInfo.viewportSize.height
     )
@@ -48,6 +50,7 @@ fun ComposeLazyGridFastScroller(
     state: LazyGridState,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    side: ScrollbarLayoutSide = ScrollbarLayoutSide.End,
     minThumbHeight: Dp = 44.dp,
     touchTargetWidth: Dp = AppConfig.fastScrollerTouchTargetDp.dp,
     dragHotZoneWidth: Dp = touchTargetWidth
@@ -56,6 +59,7 @@ fun ComposeLazyGridFastScroller(
     val visibleItems = state.layoutInfo.visibleItemsInfo.size
     if (!enabled || totalItems <= visibleItems || visibleItems <= 0 || totalItems <= 0) return
     val settings = rememberLegadoScrollbarSettings(
+        side = side,
         minThumbHeight = minThumbHeight,
         viewportMainAxisPx = state.layoutInfo.viewportSize.height
     )
@@ -70,6 +74,7 @@ fun ComposeLazyGridFastScroller(
 
 @Composable
 private fun rememberLegadoScrollbarSettings(
+    side: ScrollbarLayoutSide,
     minThumbHeight: Dp,
     viewportMainAxisPx: Int
 ): ScrollbarSettings {
@@ -83,7 +88,7 @@ private fun rememberLegadoScrollbarSettings(
     val maxThumbFraction = maxOf(minThumbFraction, 0.18f)
     return ScrollbarSettings(
         enabled = true,
-        side = ScrollbarLayoutSide.End,
+        side = side,
         alwaysShowScrollbar = false,
         scrollbarPadding = 4.dp,
         thumbThickness = 6.dp,

@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.IntRect
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.AppCompatSpinner
 import androidx.core.widget.NestedScrollView
@@ -90,7 +91,6 @@ import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.lib.theme.UiCorner
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.explore.ExploreShowActivity
-import io.legado.app.ui.book.explore.ExploreShowAdapter
 import io.legado.app.ui.book.explore.ExploreShowBookCallback
 import io.legado.app.ui.book.explore.ExploreShowWaterfallAdapter
 import io.legado.app.ui.book.SearchBookOpenHelper
@@ -111,6 +111,7 @@ import io.legado.app.ui.widget.compose.showComposeConfirmDialog
 import io.legado.app.ui.widget.compose.showComposeMultiChoiceDialog
 import io.legado.app.ui.widget.compose.showComposeTextInputDialog
 import io.legado.app.utils.SearchBookMergeUtils
+import io.legado.app.utils.StringUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.applyMainBottomBarPadding
 import io.legado.app.utils.applyStatusBarPadding
@@ -212,6 +213,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val composeDiscoverBookshelfVersion = mutableIntStateOf(0)
     private val composeDiscoverTopPadding = mutableIntStateOf(0)
     private val composeDiscoverLayoutMode = mutableIntStateOf(AppConfig.discoveryPageLayout)
+    private val composeDiscoverFilterRows =
+        mutableStateOf<List<io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow>>(emptyList())
+    private var discoverFilterOptionClick: ((Int, Int) -> Unit)? = null
     private val composeDiscoverListStyle = mutableIntStateOf(AppConfig.bookshelfListItemStyle)
     private val composeDiscoverScrollToTopSignal = mutableIntStateOf(0)
     private val composeSuiteScrollToTopSignal = mutableIntStateOf(0)
@@ -304,6 +308,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     scrollToTopSignal = composeDiscoverScrollToTopSignal.intValue,
                     isLoading = composeDiscoverLoading.value,
                     hasMore = composeDiscoverHasMore.value,
+                    filterRows = composeDiscoverFilterRows.value,
+                    onFilterOptionClick = { rowIndex, optionIndex ->
+                        discoverFilterOptionClick?.invoke(rowIndex, optionIndex)
+                    },
                     isInBookshelf = { book ->
                         composeDiscoverBookshelfVersion.intValue
                         isInBookshelf(book)
@@ -312,7 +320,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     onLoadMore = { loadDiscoverBooks(reset = false) },
                     onCanScrollBackwardChanged = {
                         composeDiscoverCanScrollBackward = it
-                        binding.topBar.setDiscoveryFiltersCollapsed(it)
                     },
                     fragment = this@ExploreFragment,
                     lifecycle = viewLifecycleOwner.lifecycle
@@ -1775,48 +1782,37 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun applyDiscoverBookLayout(force: Boolean = false) {
         val layoutMode = AppConfig.discoveryPageLayout
+        val layoutChanged = layoutMode != discoverBookLayoutMode
         composeDiscoverLayoutMode.intValue = layoutMode
         composeDiscoverListStyle.intValue = AppConfig.bookshelfListItemStyle
-        val useComposeGrid = layoutMode == 3
-        binding.composeDiscoverBooks.isVisible = useComposeGrid
-        binding.rvDiscoverBooks.isGone = useComposeGrid
+        // 列表(1)与网格(3)走 Compose,分类筛选行渲染为列表头随内容滚动;
+        // 瀑布流(2)保持 RecyclerView,分类行仍渲染进顶栏由 setDiscoveryFiltersCollapsed 折叠。
+        val useComposeList = layoutMode != 2
+        binding.composeDiscoverBooks.isVisible = useComposeList
+        binding.rvDiscoverBooks.isGone = useComposeList
         applyDiscoverBookContainerMargins(layoutMode != 2)
-        if (useComposeGrid) {
+        if (useComposeList) {
             binding.rvDiscoverBooks.removeItemDecoration(discoverListDivider)
             discoverBookLayoutMode = layoutMode
             discoverBookAdapter = null
             binding.rvDiscoverBooks.adapter = null
             syncDiscoverComposeState()
+            if (layoutChanged) renderModernDiscoveryFilterRows()
             return
         }
         if (!force && discoverBookLayoutMode == layoutMode && discoverBookAdapter != null) return
         binding.rvDiscoverBooks.removeItemDecoration(discoverListDivider)
         discoverBookLayoutMode = layoutMode
-        if (layoutMode == 1) {
-            binding.rvDiscoverBooks.layoutManager = LinearLayoutManager(requireContext())
-            binding.rvDiscoverBooks.addItemDecoration(discoverListDivider)
-            discoverBookAdapter = ExploreShowAdapter(
-                requireContext(),
-                object : ExploreShowAdapter.CallBack {
-                    override fun isInBookshelf(book: SearchBook): Boolean =
-                        this@ExploreFragment.isInBookshelf(book)
-
-                    override fun showBookInfo(book: SearchBook) {
-                        this@ExploreFragment.showBookInfo(book)
-                    }
-                }
-            )
-        } else {
-            binding.rvDiscoverBooks.layoutManager =
-                StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
-            discoverBookAdapter = ExploreShowWaterfallAdapter(requireContext(), this, 2)
-        }
+        binding.rvDiscoverBooks.layoutManager =
+            StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
+        discoverBookAdapter = ExploreShowWaterfallAdapter(requireContext(), this, 2)
         discoverBookAdapter?.also { adapter ->
             binding.rvDiscoverBooks.adapter = adapter
             if (discoverBooks.isNotEmpty()) {
                 adapter.setItems(discoverBooks.toList())
             }
         }
+        if (layoutChanged) renderModernDiscoveryFilterRows()
     }
 
     private fun applyDiscoverBookContainerMargins(useComposeList: Boolean) {
@@ -2206,10 +2202,45 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 listOfNotNull(it.bookSourceName, it.bookSourceUrl, it.bookSourceGroup)
             },
             itemKey = { it.bookSourceUrl },
-            showTitle = false
+            showTitle = false,
+            onLongSelect = { source, bounds, showMenu ->
+                showSourceActionMenu(source, showMenu)
+            }
         ) {
             selectDiscoverSource(it)
         }
+    }
+
+    private fun showSourceActionMenu(source: BookSourcePart, showMenu: (List<ModernActionPopup.Action>) -> Unit) {
+        val actions = buildList {
+            add(ModernActionPopup.Action(getString(R.string.edit)) {
+                editSource(source.bookSourceUrl)
+            })
+            add(ModernActionPopup.Action(getString(R.string.to_top)) {
+                toTop(source)
+            })
+            if (source.hasLoginUrl) {
+                add(ModernActionPopup.Action(getString(R.string.login)) {
+                    startActivity<SourceLoginActivity> {
+                        putExtra("type", "bookSource")
+                        putExtra("key", source.bookSourceUrl)
+                    }
+                })
+            }
+            add(ModernActionPopup.Action(getString(R.string.search)) {
+                searchBook(source)
+            })
+            add(ModernActionPopup.Action(getString(R.string.refresh)) {
+                adapter.clearSourceKinds(source.bookSourceUrl)
+                if (source.bookSourceUrl == selectedDiscoverSourcePart?.bookSourceUrl) {
+                    loadDiscoverBooks(reset = true)
+                }
+            })
+            add(ModernActionPopup.Action(getString(R.string.delete)) {
+                deleteSource(source)
+            })
+        }
+        showMenu(actions)
     }
 
     private fun showDiscoverKindsDialog() {
@@ -3015,10 +3046,21 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 )
                 return@forEachIndexed
             }
+
+            // 纯标题项(无 url、无 action、非控件):作为新分组的开始,自身不显示为选项。
+            // 频道标题样式不全为全宽时也能正确分组,避免其后分类归错组或整项消失。
+            currentGroup = resolveDiscoverGroupTitle(kind)
         }
         val hasMajorGroup = result.any { !it.group.isNullOrBlank() }
         val normalized = if (hasMajorGroup) {
-            result
+            // 存在分组时,无组归属的 URL 分类项兜底到"其他"组,避免被组过滤后整项消失。
+            result.map { item ->
+                if (item.group.isNullOrBlank() && item.role == DiscoverTagItem.Role.UrlTag) {
+                    item.copy(group = getString(R.string.discover_group_other))
+                } else {
+                    item
+                }
+            }
         } else {
             result.map { it.copy(group = getString(R.string.discover_group_other)) }
         }
@@ -3222,13 +3264,14 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val targetIndex = targetIndexByUrl
             ?: tagItems.indexOfFirst { !it.isButton && !it.kind.url.isNullOrBlank() }
         renderDiscoverTags(tagItems, targetIndex)
-        renderModernDiscoveryFilterRows()
         applyDiscoverDefaultFilterExpansionOnce()
         if (targetIndex >= 0) {
             selectDiscoverTag(targetIndex, tagItems[targetIndex], selectTab = true)
         } else {
             clearDiscoverBooksToEmpty(getString(R.string.explore_empty))
         }
+        // 先选中(discoverCurrentUrl 已同步)再渲染筛选行,否则选中态停留在上一个分类。
+        renderModernDiscoveryFilterRows()
     }
 
     private fun isDiscoverVisibleGroupItem(item: DiscoverTagItem): Boolean {
@@ -3314,8 +3357,37 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         )
     }
 
+    /**
+     * 分类筛选行分发:Compose 列表/网格布局下渲染进列表头,随列表滚动滚出/滚回;
+     * 选中路径固定渲染进悬浮顶栏,下滑时始终停留在顶部;
+     * 瀑布流布局的筛选行仍渲染进顶栏,由 setDiscoveryFiltersCollapsed 控制折叠。
+     */
+    private fun submitDiscoverFilterRows(
+        rows: List<io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow>,
+        onOptionClick: (rowIndex: Int, optionIndex: Int) -> Unit
+    ) {
+        val path = rows.mapNotNull { row ->
+            row.options.getOrNull(row.selectedIndex)
+                // 路径中的分类名同样去掉首尾符号(如「玄幻」→玄幻),中间符号保留。
+                ?.let { StringUtils.stripWrapSymbols(it) }
+                ?.takeIf(String::isNotBlank)
+        }.joinToString("  ›  ").takeIf { it.isNotBlank() }
+        binding.topBar.setDiscoveryPath(path)
+        if (composeDiscoverLayoutMode.intValue != 2) {
+            composeDiscoverFilterRows.value = rows
+            discoverFilterOptionClick = onOptionClick
+            binding.topBar.setDiscoveryFilterRows(emptyList()) { _, _ -> }
+        } else {
+            composeDiscoverFilterRows.value = emptyList()
+            discoverFilterOptionClick = null
+            binding.topBar.setDiscoveryFilterRows(rows, onOptionClick)
+        }
+    }
+
     private fun renderModernDiscoveryFilterRows() {
         if (!usingModernDiscovery) {
+            composeDiscoverFilterRows.value = emptyList()
+            discoverFilterOptionClick = null
             binding.topBar.setDiscoveryFilterRows(emptyList()) { _, _ -> }
             binding.topBar.setDiscoveryPath(null)
             return
@@ -3400,15 +3472,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 }
             }
         }
-        binding.topBar.setDiscoveryFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
+        submitDiscoverFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
             actions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
         }
-        binding.topBar.setDiscoveryPath(
-            actions.mapNotNull { action ->
-                action.row.options.getOrNull(action.row.selectedIndex)
-                    ?.takeIf(String::isNotBlank)
-            }.joinToString("  ›  ").takeIf { it.isNotBlank() }
-        )
     }
 
     private fun renderModernDiscoveryTree(loadSelectedUrl: Boolean) {
@@ -3438,8 +3504,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             if (levelItems.isEmpty()) break
 
             val visibleItems = levelItems.filter {
-                cleanDiscoverTitle(it.title).isNotBlank() &&
-                    (!it.children.isNullOrEmpty() || !it.discoverTargetUrl().isNullOrBlank())
+                // 放宽过滤:仅要求节点可展开或有目标 URL;
+                // 标题为空/纯符号时用 discoverKindDisplayTitle 兜底,避免整行缺失。
+                !it.children.isNullOrEmpty() || !it.discoverTargetUrl().isNullOrBlank()
             }
             if (visibleItems.isEmpty()) break
             val selectedTitle = discoverTreeSelections[level]
@@ -3451,7 +3518,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             actions += TreeRowAction(
                 row = io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
                     title = inferDiscoverSelectorTitle(rowLevel, visibleItems, inheritedTitle),
-                    options = visibleItems.map { cleanDiscoverTitle(it.title) },
+                    options = visibleItems.map { discoverKindDisplayTitle(it) },
                     selectedIndex = visibleItems.indexOfFirst { it.title == selectedTitle }
                 ),
                 click = { optionIndex ->
@@ -3497,15 +3564,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             }
         }
 
-        binding.topBar.setDiscoveryFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
+        submitDiscoverFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
             actions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
         }
-        binding.topBar.setDiscoveryPath(
-            actions.mapNotNull { action ->
-                action.row.options.getOrNull(action.row.selectedIndex)
-                    ?.takeIf(String::isNotBlank)
-            }.joinToString("  ›  ").takeIf { it.isNotBlank() }
-        )
         if (loadSelectedUrl && lastValidNode != null) {
             selectModernDiscoverTreeNode(lastValidNode!!)
         }
@@ -3575,7 +3636,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         items: List<ExploreKind>,
         inheritedTitle: String?
     ): String {
-        val titles = items.map { cleanDiscoverTitle(it.title) }
+        val titles = items.map { discoverKindDisplayTitle(it) }
         if (titles.any {
                 it.contains("男频") || it.contains("女频") ||
                     it.contains("男生频道") || it.contains("女生频道")
@@ -3614,6 +3675,14 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             .trim()
     }
 
+    /**
+     * 树形分类节点的显示标题:清理符号后为空时兜底到类型名,
+     * 保证每层总有可显示的选项文本(与拍平模式的 resolveDiscoverTagText 行为一致)。
+     */
+    private fun discoverKindDisplayTitle(kind: ExploreKind): String {
+        return cleanDiscoverTitle(kind.title).ifBlank { kind.type }
+    }
+
     private fun ExploreKind.discoverTargetUrl(): String? {
         if (type != ExploreKind.Type.url) return normalizedDiscoverUrl()
         return action?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", true) }
@@ -3647,6 +3716,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         var currentCategory: DiscoverMatrixCategory? = null
 
         kinds.forEach { kind ->
+            // 节点自带 children 的为真实树形结构,跳过矩阵重建,
+            // 避免树节点被当作标题行处理导致其子分类全部丢失。
+            if (!kind.children.isNullOrEmpty()) return@forEach
             val targetUrl = kind.discoverTargetUrl()
             val isHeader = targetUrl.isNullOrBlank() &&
                 kind.action.isNullOrBlank() &&

@@ -27,6 +27,9 @@ object StringUtils {
         DecimalFormat("#.#")
     }
 
+    // 首尾符号(标点/装饰符)匹配:用于去掉分类等名称前后包裹的符号,名称中间的符号保留。
+    private val wrapSymbolRegex = Regex("^[\\p{P}\\p{S}]+|[\\p{P}\\p{S}]+$")
+
     private val chnMap: HashMap<Char, Int>
         get() {
             val map = HashMap<Char, Int>()
@@ -266,6 +269,15 @@ object StringUtils {
             wordsS = wc
         }
         return wordsS
+    }
+
+    /**
+     * 去掉字符串首尾的符号(标点/装饰符),如「玄幻」→玄幻、[都市]→都市;
+     * 名称中间的符号(如 玄幻·都市)保留不动;若移除后为空(名称本身全是符号),返回原名。
+     */
+    fun stripWrapSymbols(str: String): String {
+        val cleaned = wrapSymbolRegex.replace(str.trim(), "").trim()
+        return cleaned.ifEmpty { str }
     }
 
     /**

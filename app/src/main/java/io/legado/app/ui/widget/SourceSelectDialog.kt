@@ -3,6 +3,7 @@ package io.legado.app.ui.widget
 import android.content.Context
 import android.graphics.drawable.ColorDrawable
 import android.view.KeyEvent
+import android.view.View
 import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
@@ -10,9 +11,11 @@ import androidx.activity.ComponentDialog
 import androidx.activity.OnBackPressedCallback
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,12 +33,16 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -45,15 +53,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.R
+import io.legado.app.ui.widget.compose.ComposeLazyListFastScroller
 import io.legado.app.ui.widget.compose.LegadoMiuixCard
 import io.legado.app.ui.widget.compose.LegadoMiuixChoiceRow
 import io.legado.app.ui.widget.compose.rememberAppDialogStyle
 import io.legado.app.ui.widget.compose.toMiuixPalette
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.windowSize
+import my.nanihadesuka.compose.ScrollbarLayoutSide
 import splitties.systemservices.windowManager
 
 object SourceSelectDialog {
@@ -67,6 +78,7 @@ object SourceSelectDialog {
         searchTexts: (T) -> List<String>,
         itemKey: (T) -> String,
         showTitle: Boolean = true,
+        onLongSelect: ((T, IntRect, (List<ModernActionPopup.Action>) -> Unit) -> Unit)? = null,
         onSelect: (T) -> Unit
     ) {
         if (items.isEmpty()) return
@@ -90,26 +102,26 @@ object SourceSelectDialog {
                 }
             }
         }
-        dialog.setContentView(
-            ComposeView(context).apply {
-                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-                setContent {
-                    SourceSelectContent(
-                        title = title.toString(),
-                        items = items,
-                        selectedKey = selectedKey,
-                        displayName = displayName,
-                        searchTexts = searchTexts,
-                        itemKey = itemKey,
-                        showTitle = showTitle,
-                        onSelect = {
-                            dialog.dismiss()
-                            onSelect(it)
-                        }
-                    )
-                }
+        val composeView = ComposeView(context).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent {
+                SourceSelectContent(
+                    title = title.toString(),
+                    items = items,
+                    selectedKey = selectedKey,
+                    displayName = displayName,
+                    searchTexts = searchTexts,
+                    itemKey = itemKey,
+                    showTitle = showTitle,
+                    onLongSelect = onLongSelect,
+                    onSelect = {
+                        dialog.dismiss()
+                        onSelect(it)
+                    }
+                )
             }
-        )
+        }
+        dialog.setContentView(composeView)
         dialog.setOnShowListener {
             val width = minOf(
                 (context.windowManager.windowSize.widthPixels * 0.94f).toInt(),
@@ -122,6 +134,11 @@ object SourceSelectDialog {
     }
 }
 
+private data class SourceSelectMenuData(
+    val actions: List<ModernActionPopup.Action>,
+    val bounds: IntRect
+)
+
 @Composable
 private fun <T> SourceSelectContent(
     title: String,
@@ -131,6 +148,7 @@ private fun <T> SourceSelectContent(
     searchTexts: (T) -> List<String>,
     itemKey: (T) -> String,
     showTitle: Boolean,
+    onLongSelect: ((T, IntRect, (List<ModernActionPopup.Action>) -> Unit) -> Unit)?,
     onSelect: (T) -> Unit
 ) {
     val style = rememberAppDialogStyle()
@@ -139,9 +157,9 @@ private fun <T> SourceSelectContent(
     val density = LocalDensity.current
     val imeBottom = with(density) { WindowInsets.ime.getBottom(this).toDp() }
     val availableHeight = (configuration.screenHeightDp.dp - imeBottom).coerceAtLeast(180.dp)
-    val maxPanelHeight = (availableHeight * 0.86f).coerceAtMost(420.dp)
+    val maxPanelHeight = (availableHeight * 0.92f).coerceAtMost(680.dp)
     val listMaxHeight = (maxPanelHeight - if (showTitle) 156.dp else 112.dp)
-        .coerceIn(72.dp, 260.dp)
+        .coerceIn(72.dp, 520.dp)
     var query by remember { mutableStateOf("") }
     val filteredItems = remember(items, query) {
         val key = query.trim()
@@ -153,102 +171,153 @@ private fun <T> SourceSelectContent(
             }
         }
     }
+    val listState = rememberLazyListState()
+    var menuState by remember { mutableStateOf<SourceSelectMenuData?>(null) }
+    
+    LaunchedEffect(items, selectedKey) {
+        if (selectedKey != null) {
+            val index = items.indexOfFirst { itemKey(it) == selectedKey }
+            if (index >= 0) {
+                listState.scrollToItem(index)
+            }
+        }
+    }
     CompositionLocalProvider(
         LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = style.bodyFontFamily)
     ) {
-        LegadoMiuixCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = maxPanelHeight)
-                .padding(horizontal = 18.dp, vertical = 12.dp),
-            color = style.surface,
-            contentColor = style.primaryText,
-            cornerRadius = style.panelRadius,
-            insidePadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)
-        ) {
-            if (showTitle) {
-                Text(
-                    text = title,
-                    color = style.primaryText,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = style.titleFontFamily,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(stringResource(R.string.screen_find)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        IconButton(onClick = { query = "" }) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_clear),
-                                contentDescription = null,
-                                tint = style.secondaryText
-                            )
-                        }
-                    }
-                },
-                textStyle = LocalTextStyle.current.copy(
-                    color = style.primaryText,
-                    fontSize = 15.sp
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = style.primaryText,
-                    unfocusedTextColor = style.primaryText,
-                    focusedContainerColor = style.fieldSurface,
-                    unfocusedContainerColor = style.fieldSurface,
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedLabelColor = style.accent,
-                    unfocusedLabelColor = style.secondaryText,
-                    cursorColor = style.accent
-                )
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            if (filteredItems.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(minOf(180.dp, listMaxHeight)),
-                    contentAlignment = androidx.compose.ui.Alignment.Center
-                ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            LegadoMiuixCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
+                    .heightIn(max = maxPanelHeight)
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                color = style.surface,
+                contentColor = style.primaryText,
+                cornerRadius = style.panelRadius,
+                insidePadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)
+            ) {
+                if (showTitle) {
                     Text(
-                        text = stringResource(R.string.empty),
-                        color = style.secondaryText,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center
+                        text = title,
+                        color = style.primaryText,
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = style.titleFontFamily,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = listMaxHeight),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    itemsIndexed(
-                        items = filteredItems,
-                        key = { index, item ->
-                            stableSourceSelectKey(itemKey(item), originalSourceSelectIndex(items, item, index))
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.screen_find)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { query = "" }) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_clear),
+                                    contentDescription = null,
+                                    tint = style.secondaryText
+                                )
+                            }
                         }
-                    ) { _, item ->
-                        LegadoMiuixChoiceRow(
-                            text = displayName(item),
-                            selected = itemKey(item) == selectedKey,
-                            palette = palette,
-                            onClick = { onSelect(item) },
-                            minHeight = 46.dp
+                    },
+                    textStyle = LocalTextStyle.current.copy(
+                        color = style.primaryText,
+                        fontSize = 15.sp
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = style.primaryText,
+                        unfocusedTextColor = style.primaryText,
+                        focusedContainerColor = style.fieldSurface,
+                        unfocusedContainerColor = style.fieldSurface,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedLabelColor = style.accent,
+                        unfocusedLabelColor = style.secondaryText,
+                        cursorColor = style.accent
+                    )
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                if (filteredItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(minOf(180.dp, listMaxHeight)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.empty),
+                            color = style.secondaryText,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = listMaxHeight)
+                    ) {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            itemsIndexed(
+                                items = filteredItems,
+                                key = { index, item ->
+                                    stableSourceSelectKey(itemKey(item), originalSourceSelectIndex(items, item, index))
+                                }
+                            ) { _, item ->
+                                val isSelected = itemKey(item) == selectedKey
+                                var itemBounds by remember { mutableStateOf(IntRect.Zero) }
+                                LegadoMiuixChoiceRow(
+                                    text = displayName(item),
+                                    selected = isSelected,
+                                    palette = palette,
+                                    onClick = { onSelect(item) },
+                                    onLongClick = {
+                                        onLongSelect?.invoke(item, itemBounds) { actions ->
+                                            menuState = SourceSelectMenuData(actions, itemBounds)
+                                        }
+                                    },
+                                    modifier = Modifier.onGloballyPositioned {
+                                        val rect = it.boundsInWindow()
+                                        itemBounds = IntRect(
+                                            rect.left.toInt(),
+                                            rect.top.toInt(),
+                                            rect.right.toInt(),
+                                            rect.bottom.toInt()
+                                        )
+                                    },
+                                    showSelectedMark = true,
+                                    minHeight = 30.dp,
+                                    compact = true,
+                                    fontSize = 15.sp
+                                )
+                            }
+                        }
+                        ComposeLazyListFastScroller(
+                            state = listState,
+                            side = ScrollbarLayoutSide.End,
+                            modifier = Modifier.align(Alignment.CenterEnd)
                         )
                     }
                 }
+            }
+
+            menuState?.let { data ->
+                ModernActionPopup.ModernMenu(
+                    actions = data.actions,
+                    anchorBounds = data.bounds,
+                    onDismiss = { menuState = null }
+                )
             }
         }
     }

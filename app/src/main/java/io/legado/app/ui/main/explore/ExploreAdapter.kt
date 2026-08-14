@@ -657,6 +657,10 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
         }
     }
 
+    fun clearSourceKinds(sourceUrl: String) {
+        sourceKinds.remove(sourceUrl)
+    }
+
     private fun showMenu(binding: ItemFindBookBinding, position: Int): Boolean {
         val source = getItem(position) ?: return true
         val actions = buildList {

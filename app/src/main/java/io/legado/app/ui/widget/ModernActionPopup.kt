@@ -47,11 +47,14 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.UiCorner
 import io.legado.app.ui.widget.compose.LegadoMiuixChoiceRow
@@ -60,6 +63,7 @@ import io.legado.app.ui.widget.compose.rememberAppDialogStyle
 import io.legado.app.ui.widget.compose.toMiuixPalette
 import io.legado.app.utils.activity
 import io.legado.app.utils.dpToPx
+import splitties.systemservices.windowManager
 
 object ModernActionPopup {
 
@@ -254,6 +258,63 @@ object ModernActionPopup {
         val host = (context as? android.app.Activity)
             ?.window?.decorView as? ViewGroup
             ?: return previousPopup
+        return showWithHost(
+            host = host,
+            anchorLeft = anchorLeft,
+            anchorTop = anchorTop,
+            anchorRight = anchorRight,
+            anchorBottom = anchorBottom,
+            actions = actions,
+            previousPopup = previousPopup,
+            maxHeightRatio = maxHeightRatio,
+            bottomGapDp = bottomGapDp,
+            lifecycleOwnerView = host
+        )
+    }
+
+    /**
+     * 新增：结合特定视图作为宿主（如 Dialog 的 DecorView）并指定坐标显示的弹出菜单。
+     * 解决在多窗口场景下的坐标对齐与点击穿透问题。
+     */
+    fun show(
+        anchor: View,
+        anchorLeft: Int,
+        anchorTop: Int,
+        anchorRight: Int,
+        anchorBottom: Int,
+        actions: List<Action>,
+        previousPopup: Handle? = null,
+        maxHeightRatio: Float = 0.62f,
+        bottomGapDp: Int = 8
+    ): Handle? {
+        if (actions.isEmpty()) return previousPopup
+        val host = anchor.rootView as? ViewGroup ?: return previousPopup
+        return showWithHost(
+            host = host,
+            anchorLeft = anchorLeft,
+            anchorTop = anchorTop,
+            anchorRight = anchorRight,
+            anchorBottom = anchorBottom,
+            actions = actions,
+            previousPopup = previousPopup,
+            maxHeightRatio = maxHeightRatio,
+            bottomGapDp = bottomGapDp,
+            lifecycleOwnerView = anchor
+        )
+    }
+
+    private fun showWithHost(
+        host: ViewGroup,
+        anchorLeft: Int,
+        anchorTop: Int,
+        anchorRight: Int,
+        anchorBottom: Int,
+        actions: List<Action>,
+        previousPopup: Handle? = null,
+        maxHeightRatio: Float,
+        bottomGapDp: Int,
+        lifecycleOwnerView: View
+    ): Handle? {
         val snapshot = calculateAnchorSnapshotFromCoords(
             anchorLeft, anchorTop, anchorRight, anchorBottom,
             host, actions, maxHeightRatio, bottomGapDp
@@ -261,9 +322,9 @@ object ModernActionPopup {
         previousPopup?.dismiss()
         val visibleState = mutableStateOf(false)
         var handle: Handle? = null
-        val overlay = ComposeView(context).apply {
+        val overlay = ComposeView(host.context).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-            installViewTreeOwnersFrom(host, context)
+            installViewTreeOwnersFrom(lifecycleOwnerView, host.context)
             isFocusable = true
             isFocusableInTouchMode = true
             setOnKeyListener { _, keyCode, event ->
@@ -282,21 +343,21 @@ object ModernActionPopup {
             }
         }
         host.addOnAttachStateChangeListener(hostDetachListener)
-        val backCallback = (context as? androidx.activity.ComponentActivity)?.let { activity ->
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    handle?.dismiss()
-                }
-            }.also { activity.onBackPressedDispatcher.addCallback(it) }
+        val backCallback = host.activity?.let { activity ->
+            if (activity is androidx.activity.ComponentActivity) {
+                object : OnBackPressedCallback(true) {
+                    override fun handleOnBackPressed() {
+                        handle?.dismiss()
+                    }
+                }.also { activity.onBackPressedDispatcher.addCallback(it) }
+            } else null
         }
-        // 创建一个不可见的锚点 View 用于生命周期管理
-        val dummyAnchor = View(context)
         handle = Handle(
             visibleState = visibleState,
             overlay = overlay,
             host = host,
             backCallback = backCallback,
-            anchor = dummyAnchor,
+            anchor = lifecycleOwnerView,
             anchorDetachListener = object : View.OnAttachStateChangeListener {
                 override fun onViewAttachedToWindow(v: View) = Unit
                 override fun onViewDetachedFromWindow(v: View) = Unit
@@ -412,6 +473,43 @@ object ModernActionPopup {
     }
 
     @Composable
+    fun ModernMenu(
+        actions: List<Action>,
+        anchorBounds: IntRect,
+        onDismiss: () -> Unit,
+        maxHeightRatio: Float = 0.62f,
+        bottomGapDp: Int = 8
+    ) {
+        val style = rememberAppDialogStyle()
+        val palette = style.toMiuixPalette()
+        val context = LocalContext.current
+        val density = LocalDensity.current
+        // 关键：在 Popup 外部捕获宿主 View，获取正确的窗口尺寸
+        val hostView = LocalView.current.rootView as ViewGroup
+        
+        // 使用 Compose 原生 Popup 解决窗口层级与布局干扰问题
+        androidx.compose.ui.window.Popup(
+            onDismissRequest = onDismiss,
+            properties = androidx.compose.ui.window.PopupProperties(
+                focusable = true,
+                dismissOnClickOutside = true
+            )
+        ) {
+            // 在 Popup 内部，坐标计算需要基于刚才捕获的 hostView
+            val snapshot = calculateAnchorSnapshotFromCoords(
+                anchorBounds.left, anchorBounds.top, anchorBounds.right, anchorBounds.bottom,
+                hostView, actions, maxHeightRatio, bottomGapDp
+            )
+            ModernActionPopupOverlay(
+                snapshot = snapshot,
+                actions = actions,
+                visible = true,
+                onDismiss = onDismiss
+            )
+        }
+    }
+
+    @Composable
     private fun ModernActionPopupOverlay(
         snapshot: AnchorSnapshot,
         actions: List<Action>,
@@ -487,7 +585,7 @@ object ModernActionPopup {
                         modifier = Modifier
                             .heightIn(max = maxHeightDp)
                             .padding(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         itemsIndexed(
                             items = actions,
@@ -514,13 +612,14 @@ object ModernActionPopup {
                                         anchorPostAction(action.invoke)
                                     }
                                 },
-                                minHeight = 42.dp,
+                                minHeight = 30.dp,
                                 compact = true,
                                 showSelectedMark = action.checked || action.persistent,
                                 enabled = action.enabled,
                                 description = action.description,
                                 leadingIconName = action.iconName,
-                                textAlign = TextAlign.Start
+                                textAlign = TextAlign.Start,
+                                fontSize = 15.sp
                             )
                         }
                     }

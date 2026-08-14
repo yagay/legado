@@ -4,9 +4,11 @@ import android.os.Build
 import android.widget.ImageView
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -600,6 +602,7 @@ fun LegadoMiuixFloatingPanel(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LegadoMiuixChoiceRow(
     text: String,
@@ -607,13 +610,15 @@ fun LegadoMiuixChoiceRow(
     palette: LegadoMiuixPalette,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
     description: String? = null,
     minHeight: Dp = 40.dp,
     compact: Boolean = false,
     showSelectedMark: Boolean = true,
     enabled: Boolean = true,
     leadingIconName: String? = null,
-    textAlign: TextAlign = TextAlign.Center
+    textAlign: TextAlign = TextAlign.Center,
+    fontSize: androidx.compose.ui.unit.TextUnit = if (compact) 13.sp else 14.sp
 ) {
     val actionRadius = palette.actionRadius ?: LocalContext.current.composeActionRadius()
     val contentAlpha = if (enabled) 1f else 0.42f
@@ -623,7 +628,11 @@ fun LegadoMiuixChoiceRow(
         modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = minHeight)
-            .clickable(enabled = enabled, onClick = onClick),
+            .combinedClickable(
+                enabled = enabled,
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(actionRadius),
         color = if (selected) palette.accent.copy(alpha = 0.14f) else palette.surfaceVariant,
         contentColor = if (selected) selectedColor else primaryColor,
@@ -636,7 +645,7 @@ fun LegadoMiuixChoiceRow(
                 .heightIn(min = minHeight)
                 .padding(
                     horizontal = if (compact) 11.dp else 13.dp,
-                    vertical = if (compact) 7.dp else 9.dp
+                    vertical = if (compact) 6.dp else 9.dp
                 ),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -660,7 +669,7 @@ fun LegadoMiuixChoiceRow(
                     color = if (selected) selectedColor else primaryColor,
                     textAlign = textAlign,
                     modifier = Modifier.fillMaxWidth(),
-                    fontSize = if (compact) 13.sp else 14.sp,
+                    fontSize = fontSize,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis

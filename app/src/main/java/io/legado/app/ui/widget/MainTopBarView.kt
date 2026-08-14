@@ -43,6 +43,7 @@ import io.legado.app.ui.widget.compose.ComposeThemeImageCrop
 import io.legado.app.ui.widget.compose.ComposeThemeImageState
 import io.legado.app.utils.ImageTypeUtils
 import io.legado.app.utils.StatusBarInsetAware
+import io.legado.app.utils.StringUtils
 
 class MainTopBarView @JvmOverloads constructor(
     context: Context,
@@ -172,7 +173,10 @@ class MainTopBarView @JvmOverloads constructor(
             topMargin = resources.getDimensionPixelSize(R.dimen.bookshelf_tag_bar_margin_top)
         })
         contentLayout.addView(discoveryRows, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-        contentLayout.addView(discoveryPath, LayoutParams(LayoutParams.MATCH_PARENT, 38.dp))
+        contentLayout.addView(discoveryPath, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            topMargin = 0.dp
+            bottomMargin = 2.dp
+        })
         primaryBar.isVisible = false
         primaryFilterRow.isVisible = false
         filterToggleButton.isVisible = false
@@ -338,7 +342,7 @@ class MainTopBarView @JvmOverloads constructor(
         val line = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.TOP
-            setPadding(0, 2.dp, 0, 2.dp)
+            setPadding(0, 0, 0, 0)
         }
         line.addView(TextView(context).apply {
             text = row.title
@@ -346,15 +350,17 @@ class MainTopBarView @JvmOverloads constructor(
             textSize = 15f
             gravity = Gravity.CENTER_VERTICAL
             typeface = context.uiTypeface()
-        }, LayoutParams(62.dp, 36.dp))
+        }, LayoutParams(62.dp, 32.dp))
         val optionArea = LinearLayout(context).apply {
             orientation = VERTICAL
         }
-        var firstRowCount = row.options.size.coerceAtMost(4).coerceAtLeast(1)
+        // 第一排数量不固定:先按全部选项渲染,布局完成后由下方 post 测量实际宽度修正为可容纳数量。
+        var firstRowCount = row.options.size.coerceAtLeast(1)
         var expanded = false
 
         fun optionView(optionIndex: Int) = TextView(context).apply {
-            text = row.options[optionIndex]
+            // 分类名首尾带符号时只显示去掉符号的文本,如「玄幻」→玄幻;post 测量复用本函数,宽度自动一致。
+            text = StringUtils.stripWrapSymbols(row.options[optionIndex])
             textSize = 14f
             gravity = Gravity.CENTER
             maxLines = 1
@@ -391,11 +397,11 @@ class MainTopBarView @JvmOverloads constructor(
                 clipChildren = false
             }
             ordered.take(firstRowCount).forEach { optionIndex ->
-                topOptions.addView(optionView(optionIndex), FlexboxLayout.LayoutParams(LayoutParams.WRAP_CONTENT, 34.dp).apply {
+                topOptions.addView(optionView(optionIndex), FlexboxLayout.LayoutParams(LayoutParams.WRAP_CONTENT, 30.dp).apply {
                     setMargins(0, 1.dp, 6.dp, 1.dp)
                 })
             }
-            topLine.addView(topOptions, LayoutParams(0, 36.dp, 1f))
+            topLine.addView(topOptions, LayoutParams(0, 32.dp, 1f))
             if (expandable) {
                 topLine.addView(TextView(context).apply {
                     text = if (expanded) "︿" else "﹀"
@@ -407,16 +413,16 @@ class MainTopBarView @JvmOverloads constructor(
                         render()
                         notifyHeightChangedAfterLayout()
                     }
-                }, LayoutParams(34.dp, 34.dp))
+                }, LayoutParams(32.dp, 32.dp))
             }
-            optionArea.addView(topLine, LayoutParams(LayoutParams.MATCH_PARENT, 36.dp))
+            optionArea.addView(topLine, LayoutParams(LayoutParams.MATCH_PARENT, 32.dp))
             if (expanded && expandable) {
                 val extraOptions = FlexboxLayout(context).apply {
                     flexWrap = FlexWrap.WRAP
                     clipChildren = false
                 }
                 ordered.drop(firstRowCount).forEach { optionIndex ->
-                    extraOptions.addView(optionView(optionIndex), FlexboxLayout.LayoutParams(LayoutParams.WRAP_CONTENT, 34.dp).apply {
+                    extraOptions.addView(optionView(optionIndex), FlexboxLayout.LayoutParams(LayoutParams.WRAP_CONTENT, 30.dp).apply {
                         setMargins(0, 1.dp, 6.dp, 1.dp)
                     })
                 }
@@ -429,23 +435,39 @@ class MainTopBarView @JvmOverloads constructor(
         render()
         line.addView(optionArea, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         optionArea.post {
-            val availableWidth = (optionArea.width - 34.dp).coerceAtLeast(1)
-            var usedWidth = 0
-            var count = 0
-            for (optionIndex in row.options.indices) {
-                val probe = optionView(optionIndex)
-                probe.measure(
-                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-                    View.MeasureSpec.makeMeasureSpec(34.dp, View.MeasureSpec.EXACTLY)
-                )
-                val measuredWidth = probe.measuredWidth + 6.dp
-                if (count > 0 && usedWidth + measuredWidth > availableWidth) break
-                if (usedWidth + measuredWidth <= availableWidth || count == 0) {
+            fun countBy(indices: List<Int>, availableWidth: Int): Int {
+                var usedWidth = 0
+                var count = 0
+                for (optionIndex in indices) {
+                    val probe = optionView(optionIndex)
+                    probe.measure(
+                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                        View.MeasureSpec.makeMeasureSpec(30.dp, View.MeasureSpec.EXACTLY)
+                    )
+                    val measuredWidth = probe.measuredWidth + 6.dp
+                    // 无条件检查宽度(含第一个):超宽选项不计入第一排,折叠到展开区,
+                    // 避免第一排被超宽项挤空或 NOWRAP 压缩变形。
+                    if (usedWidth + measuredWidth > availableWidth) break
                     usedWidth += measuredWidth
                     count++
                 }
+                return count.coerceAtMost(row.options.size)
             }
-            val resolved = count.coerceAtLeast(1).coerceAtMost(row.options.size)
+            val naturalIndices = row.options.indices.toList()
+            // 先按完整宽度测量:全部放得下则无需展开标志;
+            // 放不下再扣除标志宽度(34dp)重新计算第一排数量,保证动态适配不固定也不多扣空间。
+            val naturalCount = countBy(naturalIndices, optionArea.width)
+            val actualWidth =
+                (optionArea.width - if (naturalCount < row.options.size) 32.dp else 0).coerceAtLeast(0)
+            val selected = row.selectedIndex
+            val resolved = if (selected in row.options.indices && selected >= naturalCount) {
+                val candidate = listOf(selected) + row.options.indices.filter { it != selected }
+                val candidateCount = countBy(candidate, actualWidth)
+                // 前置项超宽放不下时放弃前置,保持原始顺序,保证第一排始终有内容。
+                if (candidateCount > 0) candidateCount else countBy(naturalIndices, actualWidth)
+            } else {
+                countBy(naturalIndices, actualWidth)
+            }
             if (resolved != firstRowCount) {
                 firstRowCount = resolved
                 render()
