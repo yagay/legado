@@ -2277,9 +2277,14 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     loadDiscoverBooks(reset = true)
                 }
             })
-            add(ModernActionPopup.Action(getString(R.string.delete)) {
-                deleteSource(source)
-            })
+            add(
+                ModernActionPopup.Action(
+                    title = getString(R.string.delete),
+                    danger = true
+                ) {
+                    deleteSource(source)
+                }
+            )
         }
         showMenu(actions)
     }
