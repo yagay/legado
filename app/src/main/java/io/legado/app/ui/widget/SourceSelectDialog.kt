@@ -346,7 +346,7 @@ private fun <T> SourceSelectContent(
                                     compact = false,
                                     verticalPadding = 4.dp,
                                     textAlign = TextAlign.Start,
-                                    fontSize = 14.sp,
+                                    fontSize = 16.sp,
                                     reverseMarquee = true
                                 )
                             }
