@@ -1042,17 +1042,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val uiCornerReplyFollow: Boolean
         get() = appCtx.getPrefBoolean(ThemeRuntimeKeys.uiCornerReplyFollow(isNightTheme), false)
 
-    var bottomBarLayoutMode: String
-        get() = appCtx.getPrefString(PreferKey.bottomBarLayoutMode, "floating")
-            ?.takeIf { it == "floating" || it == "sidebar" || it == "standard" } ?: "floating"
-        set(value) = appCtx.putPrefString(
-            PreferKey.bottomBarLayoutMode,
-            value.takeIf { it == "floating" || it == "sidebar" || it == "standard" } ?: "floating"
-        )
-
-    var floatingBottomBarHideSearch: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.floatingBottomBarHideSearch, false)
-        set(value) = appCtx.putPrefBoolean(PreferKey.floatingBottomBarHideSearch, value)
 }
 
 internal fun normalizeJsSourceApiToken(value: String?): String? {
