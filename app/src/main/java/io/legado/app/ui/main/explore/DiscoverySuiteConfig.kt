@@ -1,6 +1,5 @@
 package io.legado.app.ui.main.explore
 
-import io.legado.app.constant.PreferKey
 import io.legado.app.utils.GSON
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.putPrefString
@@ -66,6 +65,8 @@ enum class DiscoverySuiteWidgetType(val value: String) {
 }
 
 object DiscoverySuiteStore {
+    private const val CONFIG_KEY = "discoverySuiteConfig"
+    private const val SELECTED_SUITE_ID_KEY = "selectedDiscoverySuiteId"
     private const val MAX_CONFIG_CHARS = 96 * 1024
     private const val MAX_SUITES = 20
     private const val MAX_WIDGETS_PER_SUITE = 50
@@ -76,7 +77,7 @@ object DiscoverySuiteStore {
     private const val MAX_ID_CHARS = 64
 
     fun load(): DiscoverySuiteConfig {
-        val raw = appCtx.getPrefString(PreferKey.discoverySuiteConfig).orEmpty()
+        val raw = appCtx.getPrefString(CONFIG_KEY).orEmpty()
         if (raw.isBlank() || raw.length > MAX_CONFIG_CHARS) {
             return DiscoverySuiteConfig()
         }
@@ -90,16 +91,16 @@ object DiscoverySuiteStore {
         val sanitized = config.sanitize()
         val json = GSON.toJson(sanitized)
         if (json.length <= MAX_CONFIG_CHARS) {
-            appCtx.putPrefString(PreferKey.discoverySuiteConfig, json)
+            appCtx.putPrefString(CONFIG_KEY, json)
         }
     }
 
     fun selectedSuiteId(): String {
-        return appCtx.getPrefString(PreferKey.selectedDiscoverySuiteId).orEmpty()
+        return appCtx.getPrefString(SELECTED_SUITE_ID_KEY).orEmpty()
     }
 
     fun setSelectedSuiteId(id: String) {
-        appCtx.putPrefString(PreferKey.selectedDiscoverySuiteId, id.take(MAX_ID_CHARS))
+        appCtx.putPrefString(SELECTED_SUITE_ID_KEY, id.take(MAX_ID_CHARS))
     }
 
     fun newSuite(name: String): DiscoverySuite {
