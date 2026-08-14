@@ -47,6 +47,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -168,7 +169,12 @@ fun ExploreModernListScreen(
                     DiscoverFilterHeader(
                         rows = filterRows,
                         onOptionClick = onFilterOptionClick,
-                        renderConfig = renderConfig
+                        renderConfig = renderConfig,
+                        modifier = Modifier.padding(
+                            horizontal = (
+                                dimensionResource(R.dimen.bookshelf_tag_bar_margin_horizontal) - 8.dp
+                            ).coerceAtLeast(0.dp)
+                        )
                     )
                 }
             }
@@ -304,7 +310,12 @@ private fun ExploreModernGridScreen(
                     DiscoverFilterHeader(
                         rows = filterRows,
                         onOptionClick = onFilterOptionClick,
-                        renderConfig = renderConfig
+                        renderConfig = renderConfig,
+                        modifier = Modifier.padding(
+                            horizontal = (
+                                dimensionResource(R.dimen.bookshelf_tag_bar_margin_horizontal) - 8.dp
+                            ).coerceAtLeast(0.dp)
+                        )
                     )
                 }
             }
