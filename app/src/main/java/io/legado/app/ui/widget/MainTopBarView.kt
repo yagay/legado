@@ -44,7 +44,6 @@ import io.legado.app.lib.theme.secondaryTextColor
 import io.legado.app.lib.theme.titleTextColor
 import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.lib.theme.uiTypeface
-import io.legado.app.ui.main.explore.modern.ModernDiscoveryUpstreamBridge
 import io.legado.app.ui.widget.compose.ComposeThemeImageLayer
 import io.legado.app.ui.widget.compose.ComposeThemeImageCrop
 import io.legado.app.ui.widget.compose.ComposeThemeImageState
@@ -815,10 +814,12 @@ class MainTopBarView @JvmOverloads constructor(
     }
 
     private fun resolveToolbarForegroundColor(): Int {
-        if (usesUpstreamTitleBarStyle()) {
-            return ModernDiscoveryUpstreamBridge.toolbarForegroundColor(context)
+        val transparentBar = if (usesUpstreamTitleBarStyle()) {
+            !AppConfig.isEInkMode && context.transparentNavBar
+        } else {
+            !overlayOpaqueBackground
         }
-        return context.getToolbarTextColor(!overlayOpaqueBackground)
+        return context.getToolbarTextColor(transparentBar)
     }
 
     private fun applyToolbarForegroundColors() {
