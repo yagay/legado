@@ -37,6 +37,7 @@ import io.legado.app.ui.main.bookshelf.compose.BookListCardSurface
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListPalette
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListRenderConfig
 import io.legado.app.ui.widget.image.CoverImageView
+import io.legado.app.ui.widget.image.CoverStyle
 import io.legado.app.utils.BookIntroUtils
 
 private val NormalSearchBookListItemHeight = 136.dp
@@ -71,7 +72,7 @@ fun SearchBookListItem(
                 book = book,
                 modifier = Modifier
                     .width(metrics.coverWidth),
-                style = if (rounded) CoverImageView.CoverStyle.LIST else CoverImageView.CoverStyle.COMPACT,
+                style = if (rounded) CoverStyle.LIST else CoverStyle.COMPACT,
                 loadOnlyWifi = AppConfig.loadCoverOnlyWifi,
                 fragment = fragment,
                 lifecycle = lifecycle,
