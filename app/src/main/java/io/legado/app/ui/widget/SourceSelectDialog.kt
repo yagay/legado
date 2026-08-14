@@ -342,8 +342,8 @@ private fun <T> SourceSelectContent(
                                         )
                                     },
                                     showSelectedMark = true,
-                                    minHeight = 48.dp,
-                                    compact = false,
+                                    minHeight = 42.dp,
+                                    compact = true,
                                     textAlign = TextAlign.Start,
                                     fontSize = 14.sp,
                                     reverseMarquee = true
