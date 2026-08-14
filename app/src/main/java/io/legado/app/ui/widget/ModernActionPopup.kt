@@ -78,6 +78,7 @@ object ModernActionPopup {
         val checked: Boolean = false,
         val enabled: Boolean = true,
         val persistent: Boolean = false,  // true = 点击不关闭弹窗，就地更新状态
+        val danger: Boolean = false,
         val invoke: () -> Unit
     )
 
@@ -478,7 +479,8 @@ object ModernActionPopup {
         anchorBounds: IntRect,
         onDismiss: () -> Unit,
         maxHeightRatio: Float = 0.62f,
-        bottomGapDp: Int = 8
+        bottomGapDp: Int = 8,
+        upstreamMenuStyle: Boolean = false
     ) {
         val style = rememberAppDialogStyle()
         val palette = style.toMiuixPalette()
@@ -504,7 +506,8 @@ object ModernActionPopup {
                 snapshot = snapshot,
                 actions = actions,
                 visible = true,
-                onDismiss = onDismiss
+                onDismiss = onDismiss,
+                upstreamMenuStyle = upstreamMenuStyle
             )
         }
     }
@@ -514,14 +517,22 @@ object ModernActionPopup {
         snapshot: AnchorSnapshot,
         actions: List<Action>,
         visible: Boolean,
-        onDismiss: () -> Unit
+        onDismiss: () -> Unit,
+        upstreamMenuStyle: Boolean = false
     ) {
         val style = rememberAppDialogStyle()
         val palette = style.toMiuixPalette()
-        val panelShape = RoundedCornerShape(style.panelRadius)
+        val menuPalette = if (upstreamMenuStyle) {
+            palette.copy(surfaceVariant = style.surface)
+        } else {
+            palette
+        }
+        val panelShape = RoundedCornerShape(
+            if (upstreamMenuStyle) 3.dp else style.panelRadius
+        )
         val context = LocalContext.current
-        // 仅当主题确实设置了面板边框色才画边框；无边框主题不应再显描边线。
-        val hasPanelBorder = UiCorner.panelBorderColor(context) != null
+        // 上游 PopupAction 使用无描边的 shape_card_view；其他现代菜单保留主题面板边框。
+        val hasPanelBorder = !upstreamMenuStyle && UiCorner.panelBorderColor(context) != null
         // 跟踪 persistent 项的 checked 状态
         var checkedStates by remember { mutableStateOf(actions.map { it.checked }) }
         val density = LocalDensity.current
@@ -584,8 +595,10 @@ object ModernActionPopup {
                     LazyColumn(
                         modifier = Modifier
                             .heightIn(max = maxHeightDp)
-                            .padding(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                            .padding(if (upstreamMenuStyle) 5.dp else 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(
+                            if (upstreamMenuStyle) 0.dp else 5.dp
+                        )
                     ) {
                         itemsIndexed(
                             items = actions,
@@ -596,10 +609,18 @@ object ModernActionPopup {
                             } else {
                                 action.checked
                             }
+                            val actionPalette = if (action.danger) {
+                                menuPalette.copy(
+                                    accent = menuPalette.danger,
+                                    primaryText = menuPalette.danger
+                                )
+                            } else {
+                                menuPalette
+                            }
                             LegadoMiuixChoiceRow(
                                 text = action.title,
                                 selected = isChecked,
-                                palette = palette,
+                                palette = actionPalette,
                                 onClick = {
                                     if (action.persistent) {
                                         // 不关闭弹窗，就地更新状态
@@ -612,14 +633,15 @@ object ModernActionPopup {
                                         anchorPostAction(action.invoke)
                                     }
                                 },
-                                minHeight = 30.dp,
-                                compact = true,
+                                minHeight = if (upstreamMenuStyle) 48.dp else 30.dp,
+                                compact = !upstreamMenuStyle,
+                                horizontalPadding = if (upstreamMenuStyle) 16.dp else null,
                                 showSelectedMark = action.checked || action.persistent,
                                 enabled = action.enabled,
                                 description = action.description,
                                 leadingIconName = action.iconName,
                                 textAlign = TextAlign.Start,
-                                fontSize = 15.sp
+                                fontSize = if (upstreamMenuStyle) 14.sp else 15.sp
                             )
                         }
                     }
