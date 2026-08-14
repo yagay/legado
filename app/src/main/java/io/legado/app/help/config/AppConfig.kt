@@ -999,22 +999,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             value.coerceIn(MIN_FAST_SCROLLER_TOUCH_TARGET_DP, MAX_FAST_SCROLLER_TOUCH_TARGET_DP)
         )
 
-    var uiFontColor: String
-        get() = appCtx.getPrefString(ThemeRuntimeKeys.uiFontColor(isNightTheme)).orEmpty()
-        set(value) = appCtx.putPrefString(ThemeRuntimeKeys.uiFontColor(isNightTheme), value)
-
-    var uiFontPath: String
-        get() = appCtx.getPrefString(ThemeRuntimeKeys.uiFontPath(isNightTheme)).orEmpty()
-        set(value) = appCtx.putPrefString(ThemeRuntimeKeys.uiFontPath(isNightTheme), value)
-
-    var titleFontPath: String
-        get() = appCtx.getPrefString(ThemeRuntimeKeys.titleFontPath(isNightTheme)).orEmpty()
-        set(value) = appCtx.putPrefString(ThemeRuntimeKeys.titleFontPath(isNightTheme), value)
-
-    var titleFontColor: String
-        get() = appCtx.getPrefString(ThemeRuntimeKeys.titleFontColor(isNightTheme)).orEmpty()
-        set(value) = appCtx.putPrefString(ThemeRuntimeKeys.titleFontColor(isNightTheme), value)
-
     var dialogAlpha: Int
         get() = appCtx.getPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), 100).coerceIn(0, 100)
         set(value) = appCtx.putPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), value.coerceIn(0, 100))
