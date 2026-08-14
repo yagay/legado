@@ -3446,7 +3446,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         if (discoverMajorGroups.isNotEmpty()) {
             val channelSourceIndex = discoverAllTagItems
                 .asSequence()
-                .filter { it.group in discoverMajorGroups }
+                .filter { it.group != null && it.group in discoverMajorGroups }
                 .map { it.groupSourceIndex }
                 .filter { it != Int.MAX_VALUE }
                 .minOrNull()
