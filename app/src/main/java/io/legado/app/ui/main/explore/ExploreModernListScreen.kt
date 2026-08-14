@@ -72,7 +72,7 @@ import io.legado.app.ui.widget.compose.SearchBookPreviewState
 import io.legado.app.ui.widget.MainTopBarView
 import io.legado.app.ui.widget.image.CoverImageView
 import io.legado.app.utils.ColorUtils
-import io.legado.app.utils.StringUtils
+import io.legado.app.ui.main.explore.modern.ModernDiscoveryText
 import kotlin.math.roundToInt
 
 @Composable
@@ -578,7 +578,7 @@ private fun DiscoverFilterRowView(
                 for (i in indices) {
                     // 测量与显示都使用去掉首尾符号后的文本,保证容量计算与实际渲染宽度一致。
                     val textWidth = textMeasurer.measure(
-                        AnnotatedString(StringUtils.stripWrapSymbols(row.options[i])),
+                        AnnotatedString(ModernDiscoveryText.stripWrapSymbols(row.options[i])),
                         chipStyle
                     ).size.width
                     // 间距只加在相邻选项之间(第一个不加),与 FlowRow 的 spacedBy 布局完全一致,
@@ -696,7 +696,7 @@ private fun DiscoverFilterOptionChip(
     Text(
         // 选中项复用书籍 LabelsBar/AccentBgTextView 的视觉规则：
         // 主题强调色实心背景、按背景亮度自动选择黑白文字、2dp 圆角与 3dp 横向内边距。
-        text = StringUtils.stripWrapSymbols(optionText),
+        text = ModernDiscoveryText.stripWrapSymbols(optionText),
         color = textColor,
         fontSize = 14.sp,
         fontFamily = palette.bodyFontFamily,
