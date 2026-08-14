@@ -71,6 +71,7 @@ import io.legado.app.ui.widget.compose.SearchBookPreviewOverlay
 import io.legado.app.ui.widget.compose.SearchBookPreviewState
 import io.legado.app.ui.widget.MainTopBarView
 import io.legado.app.ui.widget.image.CoverImageView
+import io.legado.app.ui.widget.image.CoverStyle
 import io.legado.app.utils.ColorUtils
 import io.legado.app.ui.main.explore.modern.ModernDiscoveryText
 import kotlin.math.roundToInt
@@ -439,7 +440,7 @@ private fun ExploreGridBookItem(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(0.75f),
-                style = CoverImageView.CoverStyle.GRID,
+                style = CoverStyle.GRID,
                 loadOnlyWifi = AppConfig.loadCoverOnlyWifi,
                 fragment = fragment,
                 lifecycle = lifecycle,
