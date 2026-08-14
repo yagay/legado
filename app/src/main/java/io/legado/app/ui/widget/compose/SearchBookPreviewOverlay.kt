@@ -53,6 +53,7 @@ import io.legado.app.R
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListRenderConfig
 import io.legado.app.ui.widget.image.CoverImageView
+import io.legado.app.ui.widget.image.CoverStyle
 import io.legado.app.utils.BookIntroUtils
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -175,7 +176,7 @@ fun SearchBookPreviewOverlay(
                         modifier = Modifier
                             .matchParentSize()
                             .graphicsLayer { alpha = (1f - contentAlpha).coerceIn(0f, 1f) },
-                        style = CoverImageView.CoverStyle.PREVIEW,
+                        style = CoverStyle.PREVIEW,
                         fragment = fragment,
                         lifecycle = lifecycle,
                         preferThumb = true,
@@ -218,7 +219,7 @@ private fun SearchBookPreviewContent(
                 BookCoverImage(
                     book = book,
                     modifier = Modifier.fillMaxSize(),
-                    style = CoverImageView.CoverStyle.PREVIEW,
+                    style = CoverStyle.PREVIEW,
                     fragment = fragment,
                     lifecycle = lifecycle,
                     preferThumb = true,
