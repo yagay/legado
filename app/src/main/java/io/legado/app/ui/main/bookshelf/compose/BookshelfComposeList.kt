@@ -53,6 +53,7 @@ import io.legado.app.lib.theme.titleTypeface
 import io.legado.app.lib.theme.titleTextColor
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.ui.widget.image.CoverImageView
+import io.legado.app.ui.widget.image.CoverStyle
 import io.legado.app.utils.BookIntroUtils
 
 object BookshelfListItemStyle {
@@ -220,7 +221,7 @@ private fun BookshelfClassicListItem(
         BookshelfCoverBlock(
             item = item,
             width = metrics.coverWidth,
-            style = CoverImageView.CoverStyle.COMPACT,
+            style = CoverStyle.COMPACT,
             fragment = fragment,
             lifecycle = lifecycle
         )
@@ -264,7 +265,7 @@ private fun BookshelfRoundedCardListItem(
         BookshelfCoverBlock(
             item = item,
             width = metrics.coverWidth,
-            style = CoverImageView.CoverStyle.LIST,
+            style = CoverStyle.LIST,
             fragment = fragment,
             lifecycle = lifecycle
         )
@@ -286,7 +287,7 @@ private fun BookshelfRoundedCardListItem(
 private fun BookshelfCoverBlock(
     item: BookshelfItemUi,
     width: Dp,
-    style: CoverImageView.CoverStyle,
+    style: CoverStyle,
     fragment: Fragment?,
     lifecycle: Lifecycle?,
     modifier: Modifier = Modifier
@@ -333,7 +334,7 @@ private fun BookshelfUnreadBadge(
 private fun BookshelfListCover(
     item: BookshelfItemUi,
     width: Dp,
-    style: CoverImageView.CoverStyle,
+    style: CoverStyle,
     fragment: Fragment?,
     lifecycle: Lifecycle?,
     modifier: Modifier = Modifier,
