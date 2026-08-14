@@ -91,6 +91,7 @@ fun ExploreModernListScreen(
     onBookClick: (SearchBook) -> Unit,
     onLoadMore: () -> Unit,
     onCanScrollBackwardChanged: (Boolean) -> Unit,
+    onFilterHeaderHiddenChanged: (Boolean) -> Unit,
     fragment: Fragment,
     lifecycle: Lifecycle,
     modifier: Modifier = Modifier
@@ -108,6 +109,7 @@ fun ExploreModernListScreen(
             onBookClick = onBookClick,
             onLoadMore = onLoadMore,
             onCanScrollBackwardChanged = onCanScrollBackwardChanged,
+            onFilterHeaderHiddenChanged = onFilterHeaderHiddenChanged,
             fragment = fragment,
             lifecycle = lifecycle,
             modifier = modifier
@@ -128,6 +130,11 @@ fun ExploreModernListScreen(
                     listState.firstVisibleItemScrollOffset > 0
         }
     }
+    val filterHeaderHidden by remember(filterRows) {
+        derivedStateOf {
+            filterRows.isNotEmpty() && listState.firstVisibleItemIndex > 0
+        }
+    }
     val renderConfig = rememberBookshelfListRenderConfig()
     var previewState by remember { mutableStateOf<SearchBookPreviewState?>(null) }
 
@@ -136,6 +143,9 @@ fun ExploreModernListScreen(
     }
     LaunchedEffect(canScrollBackward) {
         onCanScrollBackwardChanged(canScrollBackward)
+    }
+    LaunchedEffect(filterHeaderHidden) {
+        onFilterHeaderHiddenChanged(filterHeaderHidden)
     }
     LaunchedEffect(scrollToTopSignal) {
         if (scrollToTopSignal > 0) {
@@ -245,6 +255,7 @@ private fun ExploreModernGridScreen(
     onBookClick: (SearchBook) -> Unit,
     onLoadMore: () -> Unit,
     onCanScrollBackwardChanged: (Boolean) -> Unit,
+    onFilterHeaderHiddenChanged: (Boolean) -> Unit,
     fragment: Fragment,
     lifecycle: Lifecycle,
     modifier: Modifier = Modifier
@@ -263,6 +274,11 @@ private fun ExploreModernGridScreen(
                     gridState.firstVisibleItemScrollOffset > 0
         }
     }
+    val filterHeaderHidden by remember(filterRows) {
+        derivedStateOf {
+            filterRows.isNotEmpty() && gridState.firstVisibleItemIndex > 0
+        }
+    }
     val renderConfig = rememberBookshelfListRenderConfig()
     var previewState by remember { mutableStateOf<SearchBookPreviewState?>(null) }
 
@@ -271,6 +287,9 @@ private fun ExploreModernGridScreen(
     }
     LaunchedEffect(canScrollBackward) {
         onCanScrollBackwardChanged(canScrollBackward)
+    }
+    LaunchedEffect(filterHeaderHidden) {
+        onFilterHeaderHiddenChanged(filterHeaderHidden)
     }
     LaunchedEffect(scrollToTopSignal) {
         if (scrollToTopSignal > 0) {
