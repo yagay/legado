@@ -29,7 +29,7 @@ internal object ModernDiscoveryCacheRepository {
             ?.compactForCache()
             ?.takeIf { it.hasBooks() }
         if (snapshot == null) {
-            appDb.cacheDao.deleteIfValueMatches(key, raw)
+            appDb.cacheDao.delete(key)
             AppLog.put("套件发现缓存内容无效，已清理并重新加载")
         }
         return snapshot
@@ -77,7 +77,7 @@ internal object ModernDiscoveryCacheRepository {
             }
             ?.takeIf { it.books.isNotEmpty() }
         if (cache == null) {
-            appDb.cacheDao.deleteIfValueMatches(key, raw)
+            appDb.cacheDao.delete(key)
             AppLog.put("发现页面缓存内容无效，已清理并重新加载")
         }
         return cache
@@ -109,32 +109,26 @@ internal object ModernDiscoveryCacheRepository {
     private fun readBounded(key: String, cacheName: String): String? {
         val now = System.currentTimeMillis()
         return try {
-            val result = appDb.cacheDao.getBoundedValue(
-                key = key,
-                now = now,
-                maxBytes = DiscoveryCachePolicy.MAX_SQLITE_VALUE_BYTES
-            ) ?: return null
-            if (!DiscoveryCachePolicy.canRead(result.byteCount)) {
-                appDb.cacheDao.deleteIfValueOversized(
-                    key,
-                    DiscoveryCachePolicy.MAX_SQLITE_VALUE_BYTES
-                )
-                AppLog.put(cacheName + " 已超过安全大小并清理：" + result.byteCount + " 字节")
+            val cache = appDb.cacheDao.get(key) ?: return null
+            if (cache.deadline > 0 && cache.deadline <= now) {
+                appDb.cacheDao.delete(key)
                 return null
             }
-            if (result.value == null) {
-                appDb.cacheDao.deleteIfValueMatches(key, null)
+            val value = cache.value
+            if (value == null) {
+                appDb.cacheDao.delete(key)
                 AppLog.put(cacheName + " 内容为空，已清理并重新加载")
                 return null
             }
-            result.value
-        } catch (e: SQLiteBlobTooBigException) {
-            runCatching {
-                appDb.cacheDao.deleteIfValueOversized(
-                    key,
-                    DiscoveryCachePolicy.MAX_SQLITE_VALUE_BYTES
-                )
+            val byteCount = value.toByteArray(Charsets.UTF_8).size.toLong()
+            if (!DiscoveryCachePolicy.canRead(byteCount)) {
+                appDb.cacheDao.delete(key)
+                AppLog.put(cacheName + " 已超过安全大小并清理：" + byteCount + " 字节")
+                return null
             }
+            value
+        } catch (e: SQLiteBlobTooBigException) {
+            runCatching { appDb.cacheDao.delete(key) }
             AppLog.put(cacheName + " 行过大，已清理并重新加载", e)
             null
         }
