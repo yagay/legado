@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.ManagementDisplayConfig
 import my.nanihadesuka.compose.InternalLazyColumnScrollbar
 import my.nanihadesuka.compose.InternalLazyVerticalGridScrollbar
 import my.nanihadesuka.compose.ScrollbarLayoutSide
@@ -25,7 +25,7 @@ fun ComposeLazyListFastScroller(
     enabled: Boolean = true,
     side: ScrollbarLayoutSide = ScrollbarLayoutSide.End,
     minThumbHeight: Dp = 44.dp,
-    touchTargetWidth: Dp = AppConfig.fastScrollerTouchTargetDp.dp,
+    touchTargetWidth: Dp = ManagementDisplayConfig.fastScrollerTouchTargetDp.dp,
     dragHotZoneWidth: Dp = touchTargetWidth
 ) {
     val totalItems = state.layoutInfo.totalItemsCount
@@ -52,7 +52,7 @@ fun ComposeLazyGridFastScroller(
     enabled: Boolean = true,
     side: ScrollbarLayoutSide = ScrollbarLayoutSide.End,
     minThumbHeight: Dp = 44.dp,
-    touchTargetWidth: Dp = AppConfig.fastScrollerTouchTargetDp.dp,
+    touchTargetWidth: Dp = ManagementDisplayConfig.fastScrollerTouchTargetDp.dp,
     dragHotZoneWidth: Dp = touchTargetWidth
 ) {
     val totalItems = state.layoutInfo.totalItemsCount
