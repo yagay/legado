@@ -89,6 +89,19 @@ val Context.titleTextColor: Int
     get() = AppConfig.titleFontColor.toThemeTextColorOrNull()
         ?: defaultThemeTextColor(AppConfig.isNightTheme)
 
+@ColorInt
+fun Context.getToolbarTextColor(transparentBar: Boolean): Int {
+    val barColor = toolbarBackgroundColor(transparentBar, primaryColor, backgroundColor)
+    return getPrimaryTextColor(ColorUtils.isColorLight(barColor))
+}
+
+@ColorInt
+internal fun toolbarBackgroundColor(
+    transparentBar: Boolean,
+    @ColorInt primaryColor: Int,
+    @ColorInt backgroundColor: Int
+): Int = if (transparentBar) backgroundColor else primaryColor
+
 val Context.transparentNavBar: Boolean
     get() = ThemeStore.transparentNavBar(this)
 
