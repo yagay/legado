@@ -86,7 +86,6 @@ import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.lib.theme.filletBackground
-import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.explore.ExploreShowActivity
 import io.legado.app.ui.book.explore.ExploreShowAdapter
 import io.legado.app.ui.book.explore.ExploreShowBookCallback
@@ -786,7 +785,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             books
         }
         if (books.isNotEmpty()) {
-            appDb.searchBookDao.insert(*books.toTypedArray())
+            ModernDiscoveryDataRepository.persistSearchBooks(books)
         }
         return books
     }
@@ -801,7 +800,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             .distinctBy { it.suiteDeckKey() }
             .take(HORIZONTAL_SUITE_PAGE_BOOK_LIMIT)
         if (books.isNotEmpty()) {
-            appDb.searchBookDao.insert(*books.toTypedArray())
+            ModernDiscoveryDataRepository.persistSearchBooks(books)
         }
         state.exhausted = books.isEmpty()
         return books
@@ -837,7 +836,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         entries
             .flatMap { it.second }
             .takeIf { it.isNotEmpty() }
-            ?.let { appDb.searchBookDao.insert(*it.toTypedArray()) }
+            ?.let { ModernDiscoveryDataRepository.persistSearchBooks(it) }
         return result
     }
 
@@ -911,7 +910,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     ): List<SearchBook> {
         return suiteTargetLoadSemaphore.withPermit {
             try {
-                WebBook.exploreBookAwait(
+                ModernDiscoveryDataRepository.loadExplorePage(
                     source,
                     tagUrl,
                     page
@@ -1199,7 +1198,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             .distinctBy { it.suiteDeckKey() }
             .take(HORIZONTAL_SUITE_PAGE_BOOK_LIMIT)
         if (books.isNotEmpty()) {
-            appDb.searchBookDao.insert(*books.toTypedArray())
+            ModernDiscoveryDataRepository.persistSearchBooks(books)
         }
         return books
     }
@@ -1212,7 +1211,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val books = loadSuiteTargetPage(source, target.tagUrl, page)
             .distinctBy { it.suiteDeckKey() }
         if (books.isNotEmpty()) {
-            appDb.searchBookDao.insert(*books.toTypedArray())
+            ModernDiscoveryDataRepository.persistSearchBooks(books)
         }
         return books
     }
@@ -3994,7 +3993,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             binding.pbDiscoverLoading.visible()
             try {
                 val newBooks = withContext(IO) {
-                    WebBook.exploreBookAwait(
+                    ModernDiscoveryDataRepository.loadExplorePage(
                         source,
                         url,
                         pageToLoad
@@ -4036,7 +4035,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     )
                     viewLifecycleOwner.lifecycleScope.launch(IO) {
                         runCatching {
-                            appDb.searchBookDao.insert(*newBooks.toTypedArray())
+                            ModernDiscoveryDataRepository.persistSearchBooks(newBooks)
                         }.onFailure {
                             AppLog.put("发现页面搜索缓存写入失败", it)
                         }
