@@ -18,9 +18,14 @@ internal object ModernDiscoveryUpstreamBridge {
 
     @ColorInt
     fun toolbarForegroundColor(context: Context): Int {
-        val actionBarStyle = context.obtainStyledAttributes(
+        val attributes = context.obtainStyledAttributes(
             intArrayOf(androidx.appcompat.R.attr.actionBarStyle)
-        ).use { it.getResourceId(0, 0) }
+        )
+        val actionBarStyle = try {
+            attributes.getResourceId(0, 0)
+        } finally {
+            attributes.recycle()
+        }
         val toolbarContext = if (actionBarStyle != 0) {
             ContextThemeWrapper(context, actionBarStyle)
         } else {
