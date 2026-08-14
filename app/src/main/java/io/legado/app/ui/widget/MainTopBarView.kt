@@ -34,6 +34,7 @@ import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.applyUiTitleTypeface
 import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.lib.theme.getToolbarTextColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
 import io.legado.app.lib.theme.titleTextColor
@@ -587,8 +588,7 @@ class MainTopBarView @JvmOverloads constructor(
             it.setPadding(padding, padding, padding, padding)
         }
         titleText.gravity = Gravity.CENTER_VERTICAL
-        titleText.setTextColor(context.titleTextColor)
-        searchEntryText.setTextColor(context.primaryTextColor)
+        applyToolbarForegroundColors()
         primaryBar.setDisplayMode(RoundedTagBarView.DisplayMode.CHIP)
         selectsBar.setDisplayMode(RoundedTagBarView.DisplayMode.CHIP)
         tagsBar.setDisplayMode(RoundedTagBarView.DisplayMode.CHIP)
@@ -638,8 +638,7 @@ class MainTopBarView @JvmOverloads constructor(
             it.setPadding(padding, padding, padding, padding)
         }
         titleText.gravity = Gravity.CENTER_VERTICAL
-        titleText.setTextColor(context.titleTextColor)
-        searchEntryText.setTextColor(context.primaryTextColor)
+        applyToolbarForegroundColors()
         primaryBar.setDisplayMode(RoundedTagBarView.DisplayMode.CHIP)
         selectsBar.setDisplayMode(RoundedTagBarView.DisplayMode.CHIP)
         tagsBar.setDisplayMode(RoundedTagBarView.DisplayMode.CHIP)
@@ -746,8 +745,23 @@ class MainTopBarView @JvmOverloads constructor(
         )
     }
 
-    private fun updateIconColors() {
-        val color = context.primaryTextColor
+    /**
+     * 复用列表模式 TitleBar 的顶栏前景色计算。覆盖式背景使用页面背景判断对比色，
+     * 透明/毛玻璃背景同样交给 getToolbarTextColor 统一选择可读的黑色或白色。
+     */
+    private fun resolveToolbarForegroundColor(): Int {
+        return context.getToolbarTextColor(transparentBar = !overlayOpaqueBackground)
+    }
+
+    private fun applyToolbarForegroundColors() {
+        val color = resolveToolbarForegroundColor()
+        titleText.setTextColor(color)
+        searchEntryText.setTextColor(color)
+        discoveryPath.setTextColor(TopBarConfig.withOpacity(color, 72))
+        updateIconColors(color)
+    }
+
+    private fun updateIconColors(color: Int = resolveToolbarForegroundColor()) {
         titleArrow.setColorFilter(color)
         searchEntryIcon.setColorFilter(color)
         listOf(moreButton, searchButton, filterButton, starButton, refreshButton, loginButton, filterToggleButton).forEach {
