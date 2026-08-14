@@ -9,6 +9,7 @@ import android.view.Window
 import android.view.WindowManager
 import androidx.activity.ComponentDialog
 import androidx.activity.OnBackPressedCallback
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,7 +41,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
@@ -114,6 +118,7 @@ object SourceSelectDialog {
                     itemKey = itemKey,
                     showTitle = showTitle,
                     onLongSelect = onLongSelect,
+                    onDismiss = dialog::dismiss,
                     onSelect = {
                         dialog.dismiss()
                         onSelect(it)
@@ -149,6 +154,7 @@ private fun <T> SourceSelectContent(
     itemKey: (T) -> String,
     showTitle: Boolean,
     onLongSelect: ((T, IntRect, (List<ModernActionPopup.Action>) -> Unit) -> Unit)?,
+    onDismiss: () -> Unit,
     onSelect: (T) -> Unit
 ) {
     val style = rememberAppDialogStyle()
@@ -176,6 +182,7 @@ private fun <T> SourceSelectContent(
     }
     val listState = rememberLazyListState()
     var menuState by remember { mutableStateOf<SourceSelectMenuData?>(null) }
+    var panelBounds by remember { mutableStateOf<Rect?>(null) }
     
     LaunchedEffect(items, selectedKey) {
         if (selectedKey != null) {
@@ -188,13 +195,25 @@ private fun <T> SourceSelectContent(
     CompositionLocalProvider(
         LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = style.bodyFontFamily)
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(panelBounds) {
+                    detectTapGestures { position ->
+                        val bounds = panelBounds
+                        if (bounds == null || !bounds.contains(position)) {
+                            onDismiss()
+                        }
+                    }
+                }
+        ) {
             LegadoMiuixCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.Center)
                     .heightIn(max = maxPanelHeight)
-                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                    .padding(horizontal = 18.dp, vertical = 12.dp)
+                    .onGloballyPositioned { panelBounds = it.boundsInParent() },
                 color = style.surface,
                 contentColor = style.primaryText,
                 cornerRadius = style.panelRadius,
