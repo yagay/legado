@@ -4,6 +4,7 @@ import android.animation.LayoutTransition
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.text.TextUtils
 import android.util.AttributeSet
@@ -583,18 +584,13 @@ class MainTopBarView @JvmOverloads constructor(
         contentLayout.layoutTransition = null
         val horizontal = resources.getDimensionPixelSize(R.dimen.bookshelf_tag_bar_margin_horizontal)
         contentLayout.setPadding(horizontal, statusBarInsetTop, horizontal, 0)
-        // 现代发现页的默认样式复用上游 TitleBar 背景规则：
-        // 墨水屏使用边框背景，透明顶栏开启时保持透明，否则使用主题主色。
-        background = when {
-            overlayOpaqueBackground && !backdropGlassActive ->
-                ColorDrawable(context.backgroundColor)
-            mode == Mode.DISCOVERY && AppConfig.isEInkMode ->
-                ContextCompat.getDrawable(context, R.drawable.bg_eink_border_bottom)
-            mode == Mode.DISCOVERY && context.transparentNavBar ->
-                ColorDrawable(Color.TRANSPARENT)
-            mode == Mode.DISCOVERY ->
-                ColorDrawable(context.primaryColor)
-            else -> null
+        // 现代发现页不再使用额外顶栏颜色，完整复用上游 TitleBar 背景规则。
+        background = if (mode == Mode.DISCOVERY) {
+            upstreamTitleBarBackground()
+        } else if (overlayOpaqueBackground && !backdropGlassActive) {
+            ColorDrawable(context.backgroundColor)
+        } else {
+            null
         }
         renderBackgroundLayer(null, 0f)
         titleRow.background = null
@@ -640,12 +636,15 @@ class MainTopBarView @JvmOverloads constructor(
         val horizontal = resources.getDimensionPixelSize(R.dimen.bookshelf_tag_bar_margin_horizontal)
         val vertical = 5.dp
         contentLayout.setPadding(horizontal, statusBarInsetTop + vertical, horizontal, vertical)
-        background = if (overlayOpaqueBackground && !backdropGlassActive) {
+        background = if (mode == Mode.DISCOVERY) {
+            upstreamTitleBarBackground()
+        } else if (overlayOpaqueBackground && !backdropGlassActive) {
             ColorDrawable(context.backgroundColor)
         } else {
             null
         }
-        val hideConfigBg = overlayOpaqueBackground || backdropGlassActive
+        val hideConfigBg =
+            mode == Mode.DISCOVERY || overlayOpaqueBackground || backdropGlassActive
         renderBackgroundLayer(
             config.takeUnless { hideConfigBg },
             if (hideConfigBg) 0f else TopBarConfig.cornerRadius(context, config)
@@ -657,7 +656,11 @@ class MainTopBarView @JvmOverloads constructor(
         searchEntry.isVisible = searchEntryRequested
         titleSpacer.isVisible = !searchEntryRequested
         titleSelect.background = null
-        searchEntry.background = TopBarSearchStyle.actionBackground(context)
+        searchEntry.background = if (mode == Mode.DISCOVERY) {
+            ContextCompat.getDrawable(context, R.drawable.bg_searchview)
+        } else {
+            TopBarSearchStyle.actionBackground(context)
+        }
         searchEntry.setPadding(14.dp, 0, 14.dp, 0)
         titleSelect.setPadding(12.dp, 0, 8.dp, 0)
         listOf(moreButton, searchButton, filterButton, starButton, refreshButton, loginButton, filterToggleButton).forEach {
@@ -782,13 +785,22 @@ class MainTopBarView @JvmOverloads constructor(
      * 复用列表模式 TitleBar 的顶栏前景色计算。覆盖式背景使用页面背景判断对比色，
      * 透明/毛玻璃背景同样交给 getToolbarTextColor 统一选择可读的黑色或白色。
      */
+    private fun upstreamTitleBarBackground(): Drawable? {
+        return when {
+            AppConfig.isEInkMode ->
+                ContextCompat.getDrawable(context, R.drawable.bg_eink_border_bottom)
+            context.transparentNavBar ->
+                ColorDrawable(Color.TRANSPARENT)
+            else ->
+                ColorDrawable(context.primaryColor)
+        }
+    }
+
     private fun resolveToolbarForegroundColor(): Int {
-        val config = TopBarConfig.currentConfig(context, AppConfig.isNightTheme)
-        val transparentBar = when {
-            overlayOpaqueBackground -> true
-            mode == Mode.DISCOVERY && config.style != TopBarConfig.STYLE_REGULAR ->
-                !AppConfig.isEInkMode && context.transparentNavBar
-            else -> !overlayOpaqueBackground
+        val transparentBar = if (mode == Mode.DISCOVERY) {
+            !AppConfig.isEInkMode && context.transparentNavBar
+        } else {
+            !overlayOpaqueBackground
         }
         return context.getToolbarTextColor(transparentBar)
     }
@@ -797,7 +809,7 @@ class MainTopBarView @JvmOverloads constructor(
         val color = resolveToolbarForegroundColor()
         titleText.setTextColor(color)
         searchEntryText.setTextColor(color)
-        discoveryPath.setTextColor(TopBarConfig.withOpacity(color, 72))
+        discoveryPath.setTextColor(color)
         updateIconColors(color)
     }
 
