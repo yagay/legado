@@ -242,8 +242,6 @@ object PreferKey {
     const val editAutoComplete = "editAutoComplete"
     const val showBoardLine = "showBoardLine"
     const val bottomBarSkin = "bottomBarSkin"
-    const val fastScrollerTouchTargetDp = "fastScrollerTouchTargetDp"
-    const val immersiveManageBar = "immersiveManageBar"
     const val coverCollectionDay = "coverCollectionDay"
     const val coverCollectionModeDay = "coverCollectionModeDay"
     const val coverCollectionModeNight = "coverCollectionModeNight"
