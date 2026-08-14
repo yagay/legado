@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import androidx.annotation.ColorInt
 import androidx.core.graphics.toColorInt
+import io.legado.app.utils.dpToPx
 
 /**
  * 增强界面对上游主题 API 的兼容层。
