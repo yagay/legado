@@ -634,7 +634,9 @@ private fun DiscoverFilterRowView(
                         fontFamily = palette.titleFontFamily,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.width(62.dp)
+                        modifier = Modifier
+                            .width(62.dp)
+                            .padding(start = 8.dp)
                     )
                     FlowRow(
                         modifier = Modifier.weight(1f),
