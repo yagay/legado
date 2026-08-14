@@ -999,10 +999,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             value.coerceIn(MIN_FAST_SCROLLER_TOUCH_TARGET_DP, MAX_FAST_SCROLLER_TOUCH_TARGET_DP)
         )
 
-    var dialogAlpha: Int
-        get() = appCtx.getPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), 100).coerceIn(0, 100)
-        set(value) = appCtx.putPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), value.coerceIn(0, 100))
-
 
 }
 
