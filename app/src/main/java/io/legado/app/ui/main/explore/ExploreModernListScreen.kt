@@ -64,7 +64,6 @@ import io.legado.app.ui.main.bookshelf.compose.BookListCardSurface
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListItemStyle
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListPalette
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListRenderConfig
-import io.legado.app.ui.main.bookshelf.compose.rememberBookshelfListRenderConfig
 import io.legado.app.ui.widget.compose.BookCoverImage
 import io.legado.app.ui.widget.compose.ComposeLazyListFastScroller
 import io.legado.app.ui.widget.compose.SearchBookListItem
@@ -148,7 +147,7 @@ fun ExploreModernListScreen(
             }
         }
     }
-    val renderConfig = rememberBookshelfListRenderConfig()
+    val renderConfig = rememberDiscoveryDefaultRenderConfig()
     var previewState by remember { mutableStateOf<SearchBookPreviewState?>(null) }
 
     LaunchedEffect(shouldLoadMore) {
@@ -305,7 +304,7 @@ private fun ExploreModernGridScreen(
             }
         }
     }
-    val renderConfig = rememberBookshelfListRenderConfig()
+    val renderConfig = rememberDiscoveryDefaultRenderConfig()
     var previewState by remember { mutableStateOf<SearchBookPreviewState?>(null) }
 
     LaunchedEffect(shouldLoadMore) {
@@ -509,7 +508,7 @@ internal fun DiscoverFilterHeaderForRecycler(
     DiscoverFilterHeader(
         rows = rows,
         onOptionClick = onOptionClick,
-        renderConfig = rememberBookshelfListRenderConfig(),
+        renderConfig = rememberDiscoveryDefaultRenderConfig(),
         modifier = modifier
     )
 }
