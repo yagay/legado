@@ -49,6 +49,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
@@ -61,6 +62,8 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.R
+import io.legado.app.lib.theme.configuredPrimaryTextColor
+import io.legado.app.lib.theme.configuredSecondaryTextColor
 import io.legado.app.ui.widget.compose.ComposeLazyListFastScroller
 import io.legado.app.ui.widget.compose.LegadoMiuixCard
 import io.legado.app.ui.widget.compose.LegadoMiuixChoiceRow
@@ -157,7 +160,16 @@ private fun <T> SourceSelectContent(
     onDismiss: () -> Unit,
     onSelect: (T) -> Unit
 ) {
-    val style = rememberDefaultAppDialogStyle()
+    val context = LocalContext.current
+    val defaultStyle = rememberDefaultAppDialogStyle()
+    val configuredPrimaryText = Color(context.configuredPrimaryTextColor)
+    val configuredSecondaryText = Color(context.configuredSecondaryTextColor)
+    val style = remember(defaultStyle, configuredPrimaryText, configuredSecondaryText) {
+        defaultStyle.copy(
+            primaryText = configuredPrimaryText,
+            secondaryText = configuredSecondaryText
+        )
+    }
     val palette = style.toMiuixPalette()
     // 书源选择列表复用上游纵向菜单的表面色：普通行与面板同色，
     // 选中行仍保留主题强调色，搜索和快速滚动结构保持不变。
