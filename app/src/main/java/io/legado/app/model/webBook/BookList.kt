@@ -1,6 +1,5 @@
 package io.legado.app.model.webBook
 
-import com.google.gson.JsonArray
 import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
@@ -100,7 +99,7 @@ object BookList {
         collections = try {
             analyzeRule.getElements(ruleList)
         } catch (error: Exception) {
-            extractExploreContentArray(body, isSearch)?.let { contentArray ->
+            ExploreContentCompatibility.extractArray(body, isSearch)?.let { contentArray ->
                 exploreContentArray = contentArray
                 Debug.log(bookSource.bookSourceUrl, "≡发现响应为数组包装，使用首项 content 继续解析")
                 analyzeRule.setContent(contentArray.toString()).setBaseUrl(baseUrl)
@@ -108,7 +107,7 @@ object BookList {
             } ?: throw error
         }
         if (collections.isEmpty()) {
-            extractExploreContentArray(body, isSearch)?.let { contentArray ->
+            ExploreContentCompatibility.extractArray(body, isSearch)?.let { contentArray ->
                 exploreContentArray = contentArray
                 Debug.log(bookSource.bookSourceUrl, "≡发现规则返回空列表，使用首项 content 重新解析")
                 analyzeRule.setContent(contentArray.toString()).setBaseUrl(baseUrl)
@@ -326,19 +325,6 @@ object BookList {
         GSON.fromJsonArray<ExploreKind>(json).getOrNull()?.let {
             Debug.log("≡发现地址规则 JSON 格式不规范，请改为规范格式")
         }
-    }
-
-    /**
-     * 兼容少量旧发现接口返回 [{"content":[...]}]，而书源组合规则先按 $.data
-     * 读取对象导致失败的情况。仅在非搜索请求且结构严格匹配时启用。
-     */
-    private fun extractExploreContentArray(body: String, isSearch: Boolean): JsonArray? {
-        if (isSearch) return null
-        val root = runCatching { GSON.fromJson(body, JsonArray::class.java) }.getOrNull()
-            ?: return null
-        if (root.size() != 1 || !root.first().isJsonObject) return null
-        val content = root.first().asJsonObject.get("content") ?: return null
-        return content.takeIf { it.isJsonArray }?.asJsonArray
     }
 
 }
