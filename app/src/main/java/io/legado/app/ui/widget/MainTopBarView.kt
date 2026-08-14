@@ -49,13 +49,12 @@ import io.legado.app.ui.widget.compose.ComposeThemeImageCrop
 import io.legado.app.ui.widget.compose.ComposeThemeImageState
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.ImageTypeUtils
-import io.legado.app.utils.StatusBarInsetAware
 import io.legado.app.ui.main.explore.modern.ModernDiscoveryText
 
 class MainTopBarView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
-) : LinearLayout(context, attrs), StatusBarInsetAware {
+) : LinearLayout(context, attrs) {
 
     enum class Mode { BOOKSHELF, DISCOVERY, RSS, READ_RECORD }
 
@@ -567,7 +566,7 @@ class MainTopBarView @JvmOverloads constructor(
         updateIconColors()
     }
 
-    override fun onStatusBarInsetChanged(insetTop: Int, initialPaddingTop: Int) {
+    fun onStatusBarInsetChanged(insetTop: Int) {
         if (statusBarInsetTop == insetTop) return
         statusBarInsetTop = insetTop
         applyTopBarStyle(force = true, resetFilters = false)
