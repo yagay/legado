@@ -14,7 +14,7 @@ import io.legado.app.utils.gone
 import io.legado.app.utils.visible
 
 
-class ExploreShowAdapter(context: Context, val callBack: CallBack) :
+class ExploreShowAdapter(context: Context, val callBack: ExploreShowBookCallback) :
     RecyclerAdapter<SearchBook, ItemSearchBinding>(context) {
 
     override fun getViewBinding(parent: ViewGroup): ItemSearchBinding {
@@ -83,12 +83,4 @@ class ExploreShowAdapter(context: Context, val callBack: CallBack) :
         }
     }
 
-    interface CallBack {
-        /**
-         * 是否已经加入书架
-         */
-        fun isInBookshelf(book: SearchBook): Boolean
-
-        fun showBookInfo(book: SearchBook)
-    }
 }

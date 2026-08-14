@@ -91,6 +91,7 @@ import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.lib.theme.UiCorner
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.explore.ExploreShowActivity
+import io.legado.app.ui.book.explore.ExploreShowAdapter
 import io.legado.app.ui.book.explore.ExploreShowBookCallback
 import io.legado.app.ui.book.explore.ExploreShowWaterfallAdapter
 import io.legado.app.ui.book.SearchBookOpenHelper
@@ -1785,13 +1786,14 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val layoutChanged = layoutMode != discoverBookLayoutMode
         composeDiscoverLayoutMode.intValue = layoutMode
         composeDiscoverListStyle.intValue = AppConfig.bookshelfListItemStyle
-        // 列表(1)与网格(3)走 Compose,分类筛选行渲染为列表头随内容滚动;
-        // 瀑布流(2)保持 RecyclerView,分类行仍渲染进顶栏由 setDiscoveryFiltersCollapsed 折叠。
-        val useComposeList = layoutMode != 2
-        binding.composeDiscoverBooks.isVisible = useComposeList
-        binding.rvDiscoverBooks.isGone = useComposeList
-        applyDiscoverBookContainerMargins(layoutMode != 2)
-        if (useComposeList) {
+
+        // 网格继续使用 Compose；列表直接复用上游二级发现页的 ExploreShowAdapter，
+        // 瀑布流保留专用适配器。这样列表项目样式和行为只由上游实现维护。
+        val useComposeGrid = layoutMode == 3
+        binding.composeDiscoverBooks.isVisible = useComposeGrid
+        binding.rvDiscoverBooks.isGone = useComposeGrid
+        applyDiscoverBookContainerMargins(useComposeGrid)
+        if (useComposeGrid) {
             binding.rvDiscoverBooks.removeItemDecoration(discoverListDivider)
             discoverBookLayoutMode = layoutMode
             discoverBookAdapter = null
@@ -1800,12 +1802,19 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             if (layoutChanged) renderModernDiscoveryFilterRows()
             return
         }
+
         if (!force && discoverBookLayoutMode == layoutMode && discoverBookAdapter != null) return
         binding.rvDiscoverBooks.removeItemDecoration(discoverListDivider)
         discoverBookLayoutMode = layoutMode
-        binding.rvDiscoverBooks.layoutManager =
-            StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
-        discoverBookAdapter = ExploreShowWaterfallAdapter(requireContext(), this, 2)
+        discoverBookAdapter = if (layoutMode == 2) {
+            binding.rvDiscoverBooks.layoutManager =
+                StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
+            ExploreShowWaterfallAdapter(requireContext(), this, 2)
+        } else {
+            binding.rvDiscoverBooks.layoutManager = LinearLayoutManager(requireContext())
+            binding.rvDiscoverBooks.addItemDecoration(discoverListDivider)
+            ExploreShowAdapter(requireContext(), this)
+        }
         discoverBookAdapter?.also { adapter ->
             binding.rvDiscoverBooks.adapter = adapter
             if (discoverBooks.isNotEmpty()) {
@@ -3358,9 +3367,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     /**
-     * 分类筛选行分发:Compose 列表/网格布局下渲染进列表头,随列表滚动滚出/滚回;
-     * 选中路径固定渲染进悬浮顶栏,下滑时始终停留在顶部;
-     * 瀑布流布局的筛选行仍渲染进顶栏,由 setDiscoveryFiltersCollapsed 控制折叠。
+     * 分类筛选行分发:Compose 网格布局下渲染进列表头；
+     * 原始列表与瀑布流使用顶栏筛选行，由 setDiscoveryFiltersCollapsed 控制折叠；
+     * 选中路径固定渲染进悬浮顶栏。
      */
     private fun submitDiscoverFilterRows(
         rows: List<io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow>,
@@ -3373,7 +3382,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 ?.takeIf(String::isNotBlank)
         }.joinToString("  ›  ").takeIf { it.isNotBlank() }
         binding.topBar.setDiscoveryPath(path)
-        if (composeDiscoverLayoutMode.intValue != 2) {
+        if (composeDiscoverLayoutMode.intValue == 3) {
             composeDiscoverFilterRows.value = rows
             discoverFilterOptionClick = onOptionClick
             binding.topBar.setDiscoveryFilterRows(emptyList()) { _, _ -> }
