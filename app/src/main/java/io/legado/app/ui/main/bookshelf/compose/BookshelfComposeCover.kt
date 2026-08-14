@@ -11,6 +11,7 @@ import io.legado.app.help.config.CoverCollectionManager
 import io.legado.app.help.config.CoverCollectionManager.isRealCoverPath
 import io.legado.app.ui.widget.compose.BookCoverImage
 import io.legado.app.ui.widget.image.CoverImageView
+import io.legado.app.ui.widget.image.CoverStyle
 
 @Composable
 fun BookshelfComposeCover(
@@ -19,7 +20,7 @@ fun BookshelfComposeCover(
     fragment: Fragment? = null,
     lifecycle: Lifecycle? = null,
     fillBounds: Boolean = false,
-    style: CoverImageView.CoverStyle = CoverImageView.CoverStyle.GRID
+    style: CoverStyle = CoverStyle.GRID
 ) {
     val coverRequest = remember(item.coverIdentityKey()) {
         item.toCoverRequest()
