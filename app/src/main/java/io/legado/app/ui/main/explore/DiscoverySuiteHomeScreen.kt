@@ -70,6 +70,7 @@ import io.legado.app.ui.widget.compose.SearchBookPreviewState
 import io.legado.app.ui.widget.compose.appSettingPanelBackground
 import io.legado.app.ui.widget.compose.rememberAppManagementPalette
 import io.legado.app.ui.widget.image.CoverImageView
+import io.legado.app.ui.widget.image.CoverStyle
 import kotlin.math.roundToInt
 
 private const val BOOK_COVER_ASPECT_RATIO = 0.75f
@@ -617,7 +618,7 @@ private fun DiscoverySuiteWaterfallBookCard(
             BookCoverImage(
                 book = book,
                 modifier = Modifier.fillMaxSize(),
-                style = CoverImageView.CoverStyle.GRID,
+                style = CoverStyle.GRID,
                 loadOnlyWifi = AppConfig.loadCoverOnlyWifi,
                 fragment = fragment,
                 lifecycle = lifecycle,
@@ -1013,7 +1014,7 @@ private fun DiscoverySuiteRankedListBookRow(
             BookCoverImage(
                 book = book,
                 modifier = Modifier.fillMaxSize(),
-                style = CoverImageView.CoverStyle.COMPACT,
+                style = CoverStyle.COMPACT,
                 loadOnlyWifi = AppConfig.loadCoverOnlyWifi,
                 fragment = fragment,
                 lifecycle = lifecycle,
@@ -1207,7 +1208,7 @@ private fun DiscoverySuiteCoverBookItem(
             BookCoverImage(
                 book = book,
                 modifier = Modifier.fillMaxSize(),
-                style = CoverImageView.CoverStyle.GRID,
+                style = CoverStyle.GRID,
                 loadOnlyWifi = AppConfig.loadCoverOnlyWifi,
                 fragment = fragment,
                 lifecycle = lifecycle,
