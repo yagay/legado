@@ -51,6 +51,7 @@ import io.legado.app.R
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.BookType
 import io.legado.app.data.AppDatabase
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
@@ -1707,7 +1708,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 .distinctUntilChanged()
                 .collect { books ->
                     discoverBookshelf.clear()
-                    books.filterNot { it.isNotShelf }
+                    books.filterNot { it.type and BookType.notShelf > 0 }
                         .forEach {
                             discoverBookshelf.add("${it.name}-${it.author}")
                             discoverBookshelf.add(it.name)
