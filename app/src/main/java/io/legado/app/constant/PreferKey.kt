@@ -249,8 +249,6 @@ object PreferKey {
     const val fastScrollerTouchTargetDp = "fastScrollerTouchTargetDp"
     const val immersiveManageBar = "immersiveManageBar"
     const val loadCoverHighQuality = "loadCoverHighQuality"
-    const val bottomBarLayoutMode = "bottomBarLayoutMode"
-    const val floatingBottomBarHideSearch = "floatingBottomBarHideSearch"
     const val coverCollectionDay = "coverCollectionDay"
     const val coverCollectionModeDay = "coverCollectionModeDay"
     const val coverCollectionModeNight = "coverCollectionModeNight"
