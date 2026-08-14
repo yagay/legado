@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -619,7 +620,8 @@ fun LegadoMiuixChoiceRow(
     enabled: Boolean = true,
     leadingIconName: String? = null,
     textAlign: TextAlign = TextAlign.Center,
-    fontSize: androidx.compose.ui.unit.TextUnit = if (compact) 13.sp else 14.sp
+    fontSize: androidx.compose.ui.unit.TextUnit = if (compact) 13.sp else 14.sp,
+    reverseMarquee: Boolean = false
 ) {
     val actionRadius = palette.actionRadius ?: LocalContext.current.composeActionRadius()
     val contentAlpha = if (enabled) 1f else 0.42f
@@ -665,16 +667,26 @@ fun LegadoMiuixChoiceRow(
                     else -> Alignment.CenterHorizontally
                 }
             ) {
-                Text(
-                    text = text,
-                    color = if (selected) selectedColor else primaryColor,
-                    textAlign = textAlign,
-                    modifier = Modifier.fillMaxWidth(),
-                    fontSize = fontSize,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (reverseMarquee) {
+                    ReverseMarqueeText(
+                        text = text,
+                        color = if (selected) selectedColor else primaryColor,
+                        textAlign = textAlign,
+                        fontSize = fontSize,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                    )
+                } else {
+                    Text(
+                        text = text,
+                        color = if (selected) selectedColor else primaryColor,
+                        textAlign = textAlign,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontSize = fontSize,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 description?.takeIf { it.isNotBlank() }?.let {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -710,6 +722,45 @@ fun LegadoMiuixChoiceRow(
             }
         }
     }
+}
+
+@Composable
+private fun ReverseMarqueeText(
+    text: String,
+    color: Color,
+    textAlign: TextAlign,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontWeight: FontWeight
+) {
+    val scrollState = rememberScrollState(initial = Int.MAX_VALUE)
+    LaunchedEffect(text, scrollState.maxValue) {
+        val end = scrollState.maxValue
+        if (end <= 0) return@LaunchedEffect
+        scrollState.scrollTo(end)
+        delay(700)
+        while (true) {
+            scrollState.animateScrollTo(
+                value = 0,
+                animationSpec = tween(durationMillis = (end * 12).coerceIn(2_200, 8_000))
+            )
+            delay(1_200)
+            scrollState.scrollTo(end)
+            delay(700)
+        }
+    }
+    Text(
+        text = text,
+        color = color,
+        textAlign = textAlign,
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState),
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip
+    )
 }
 
 private object LegadoMiuixCenterPopupPositionProvider : PopupPositionProvider {
