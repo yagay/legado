@@ -10,7 +10,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
-import io.legado.app.constant.PreferKey
+import io.legado.app.lib.theme.ThemePreferenceKeys
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.TopBarConfig
 import io.legado.app.lib.theme.UiCorner
@@ -84,7 +84,7 @@ class RoundedTagBarView @JvmOverloads constructor(
             ?: if (config.style == TopBarConfig.STYLE_REGULAR) {
                 Color.WHITE
             } else {
-                context.themeColorOrNull(PreferKey.themeTabBackgroundColor)
+                context.themeColorOrNull(ThemePreferenceKeys.themeTabBackgroundColor)
                     ?: context.themeMutedColorOrDefault()
             }
         val selectedColor = config.tagSelectedColor
