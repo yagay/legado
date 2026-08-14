@@ -1003,23 +1003,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), 100).coerceIn(0, 100)
         set(value) = appCtx.putPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), value.coerceIn(0, 100))
 
-    var uiCornerScale: Float
-        get() = appCtx.getPrefString(ThemeRuntimeKeys.uiCornerScale(isNightTheme), "1")
-            ?.toFloatOrNull()?.coerceIn(0f, 3f) ?: 1f
-        set(value) = appCtx.putPrefString(
-            ThemeRuntimeKeys.uiCornerScale(isNightTheme),
-            value.coerceIn(0f, 3f).toString()
-        )
-
-    var uiLayoutAlpha: Int
-        get() = appCtx.getPrefInt(ThemeRuntimeKeys.uiLayoutAlpha(isNightTheme), 100).coerceIn(0, 100)
-        set(value) = appCtx.putPrefInt(ThemeRuntimeKeys.uiLayoutAlpha(isNightTheme), value.coerceIn(0, 100))
-
-    val uiCornerSearchFollow: Boolean
-        get() = appCtx.getPrefBoolean(ThemeRuntimeKeys.uiCornerSearchFollow(isNightTheme), false)
-
-    val uiCornerReplyFollow: Boolean
-        get() = appCtx.getPrefBoolean(ThemeRuntimeKeys.uiCornerReplyFollow(isNightTheme), false)
 
 }
 
