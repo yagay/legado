@@ -153,6 +153,9 @@ private fun <T> SourceSelectContent(
 ) {
     val style = rememberAppDialogStyle()
     val palette = style.toMiuixPalette()
+    // 书源选择列表复用上游纵向菜单的表面色：普通行与面板同色，
+    // 选中行仍保留主题强调色，搜索和快速滚动结构保持不变。
+    val menuPalette = palette.copy(surfaceVariant = style.surface)
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val imeBottom = with(density) { WindowInsets.ime.getBottom(this).toDp() }
@@ -267,7 +270,7 @@ private fun <T> SourceSelectContent(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                            verticalArrangement = Arrangement.spacedBy(0.dp)
                         ) {
                             itemsIndexed(
                                 items = filteredItems,
@@ -280,7 +283,7 @@ private fun <T> SourceSelectContent(
                                 LegadoMiuixChoiceRow(
                                     text = displayName(item),
                                     selected = isSelected,
-                                    palette = palette,
+                                    palette = menuPalette,
                                     onClick = { onSelect(item) },
                                     onLongClick = {
                                         onLongSelect?.invoke(item, itemBounds) { actions ->
@@ -297,9 +300,10 @@ private fun <T> SourceSelectContent(
                                         )
                                     },
                                     showSelectedMark = true,
-                                    minHeight = 30.dp,
-                                    compact = true,
-                                    fontSize = 15.sp
+                                    minHeight = 48.dp,
+                                    compact = false,
+                                    textAlign = TextAlign.Start,
+                                    fontSize = 14.sp
                                 )
                             }
                         }
