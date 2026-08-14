@@ -68,7 +68,6 @@ import io.legado.app.help.config.TopBarConfig
 import io.legado.app.help.source.clearExploreKindsCache
 import io.legado.app.help.source.exploreKinds
 import io.legado.app.help.source.exploreKindsJson
-import io.legado.app.help.webView.WebViewPool
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
@@ -3791,14 +3790,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             suiteLoadJob = null
             binding.swipeRefreshLayout.isRefreshing = false
         }
-        WebViewPool.scheduleDestroyScope(WebViewPool.Scope.DISCOVERY)
         super.onPause()
     }
 
     override fun onDestroyView() {
         stopModernMode()
         stopSuiteMode()
-        WebViewPool.destroyScope(WebViewPool.Scope.DISCOVERY)
         oldModeInitialized = false
         modernModeInitialized = false
         groupsMenu = null
