@@ -115,6 +115,28 @@ data class AppDialogStyle(
 )
 
 @Composable
+fun rememberDefaultAppDialogStyle(): AppDialogStyle {
+    val context = LocalContext.current
+    val base = rememberAppDialogStyle()
+    val surface = Color(context.bottomBackground)
+    val fieldSurface = Color(ContextCompat.getColor(context, R.color.background_menu))
+    val primaryText = Color(context.primaryTextColor)
+    val secondaryText = Color(context.secondaryTextColor)
+    val stroke = Color(ContextCompat.getColor(context, R.color.bg_divider_line))
+    return remember(base, surface, fieldSurface, primaryText, secondaryText, stroke) {
+        base.copy(
+            surface = surface,
+            fieldSurface = fieldSurface,
+            primaryText = primaryText,
+            secondaryText = secondaryText,
+            stroke = stroke,
+            panelRadius = 3.dp,
+            actionRadius = 3.dp
+        )
+    }
+}
+
+@Composable
 fun rememberAppDialogStyle(): AppDialogStyle {
     val context = LocalContext.current
     val night = AppConfig.isNightTheme
