@@ -300,7 +300,7 @@ private fun ExploreModernGridScreen(
                     gridState.firstVisibleItemScrollOffset > 0
                 hasScrolled && (
                     header == null ||
-                        header.offset + header.size <= layoutInfo.viewportStartOffset
+                        header.offset.y + header.size.height <= layoutInfo.viewportStartOffset
                     )
             }
         }
