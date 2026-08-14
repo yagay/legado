@@ -11,8 +11,7 @@ data class ExploreKind(
     val chars: Array<String?>? = null,
     val default: String? = null,
     var viewName: String? = null,
-    val style: FlexChildStyle? = null,
-    val children: List<ExploreKind>? = null
+    val style: FlexChildStyle? = null
 ) {
 
     @Suppress("ConstPropertyName")
@@ -37,7 +36,6 @@ data class ExploreKind(
                     && other.url == url
                     && other.action == action
                     && other.default == default
-                    && other.children == children
         }
         return false
     }
@@ -47,7 +45,6 @@ data class ExploreKind(
         result = 31 * result + (url?.hashCode() ?: 0)
         result = 31 * result + (action?.hashCode() ?: 0)
         result = 31 * result + (default?.hashCode() ?: 0)
-        result = 31 * result + (children?.hashCode() ?: 0)
         return result
     }
 
