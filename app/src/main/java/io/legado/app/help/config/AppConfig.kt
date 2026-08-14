@@ -54,7 +54,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var clickActionBR = appCtx.getPrefInt(PreferKey.clickActionBR, 1)
     var themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
     var useDefaultCover = appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
-    var loadCoverHighQuality = appCtx.getPrefBoolean(PreferKey.loadCoverHighQuality, false)
     var optimizeRender = CanvasRecorderFactory.isSupport
             && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
     var recordLog = appCtx.getPrefBoolean(PreferKey.recordLog)
@@ -1015,10 +1014,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var titleFontColor: String
         get() = appCtx.getPrefString(ThemeRuntimeKeys.titleFontColor(isNightTheme)).orEmpty()
         set(value) = appCtx.putPrefString(ThemeRuntimeKeys.titleFontColor(isNightTheme), value)
-
-    var bookCoverShadow: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.bookCoverShadow, true)
-        set(value) = appCtx.putPrefBoolean(PreferKey.bookCoverShadow, value)
 
     var dialogAlpha: Int
         get() = appCtx.getPrefInt(ThemeRuntimeKeys.dialogAlpha(isNightTheme), 100).coerceIn(0, 100)
