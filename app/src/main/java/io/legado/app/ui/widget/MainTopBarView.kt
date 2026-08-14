@@ -35,9 +35,11 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.applyUiTitleTypeface
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.getToolbarTextColor
+import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
 import io.legado.app.lib.theme.titleTextColor
+import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.ui.widget.compose.ComposeThemeImageLayer
 import io.legado.app.ui.widget.compose.ComposeThemeImageCrop
@@ -581,11 +583,18 @@ class MainTopBarView @JvmOverloads constructor(
         contentLayout.layoutTransition = null
         val horizontal = resources.getDimensionPixelSize(R.dimen.bookshelf_tag_bar_margin_horizontal)
         contentLayout.setPadding(horizontal, statusBarInsetTop, horizontal, 0)
-        // 覆盖式场景(如发现页顶栏浮在列表之上)需要不透明底，否则滚动的书籍会从透明顶栏后透出。
-        background = if (overlayOpaqueBackground && !backdropGlassActive) {
-            ColorDrawable(context.backgroundColor)
-        } else {
-            null
+        // 现代发现页的默认样式复用上游 TitleBar 背景规则：
+        // 墨水屏使用边框背景，透明顶栏开启时保持透明，否则使用主题主色。
+        background = when {
+            overlayOpaqueBackground && !backdropGlassActive ->
+                ColorDrawable(context.backgroundColor)
+            mode == Mode.DISCOVERY && AppConfig.isEInkMode ->
+                ContextCompat.getDrawable(context, R.drawable.bg_eink_border_bottom)
+            mode == Mode.DISCOVERY && context.transparentNavBar ->
+                ColorDrawable(Color.TRANSPARENT)
+            mode == Mode.DISCOVERY ->
+                ColorDrawable(context.primaryColor)
+            else -> null
         }
         renderBackgroundLayer(null, 0f)
         titleRow.background = null
@@ -774,7 +783,14 @@ class MainTopBarView @JvmOverloads constructor(
      * 透明/毛玻璃背景同样交给 getToolbarTextColor 统一选择可读的黑色或白色。
      */
     private fun resolveToolbarForegroundColor(): Int {
-        return context.getToolbarTextColor(transparentBar = !overlayOpaqueBackground)
+        val config = TopBarConfig.currentConfig(context, AppConfig.isNightTheme)
+        val transparentBar = when {
+            overlayOpaqueBackground -> true
+            mode == Mode.DISCOVERY && config.style != TopBarConfig.STYLE_REGULAR ->
+                !AppConfig.isEInkMode && context.transparentNavBar
+            else -> !overlayOpaqueBackground
+        }
+        return context.getToolbarTextColor(transparentBar)
     }
 
     private fun applyToolbarForegroundColors() {
