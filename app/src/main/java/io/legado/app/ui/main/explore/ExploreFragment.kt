@@ -3006,6 +3006,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     ): List<DiscoverTagItem> {
         val blocked = blockedButtonActions[source.bookSourceUrl]
         var currentGroup: String? = null
+        var currentGroupSourceIndex = Int.MAX_VALUE
         val result = mutableListOf<DiscoverTagItem>()
         kinds.forEachIndexed { index, kind ->
             if (index == 0 && isDiscoverLeadingBlankPlaceholder(kind)) {
@@ -3024,6 +3025,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
             if (action.isNullOrBlank() && isDiscoverMajorGroupKind(kind)) {
                 currentGroup = resolveDiscoverGroupTitle(kind)
+                currentGroupSourceIndex = index
                 return@forEachIndexed
             }
 
@@ -3032,13 +3034,15 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     kind = kind.copy(type = ExploreKind.Type.select),
                     text = resolveDiscoverTagText(kind).limitDiscoverText(6),
                     role = DiscoverTagItem.Role.GlobalSelect,
-                    group = null
+                    group = null,
+                    sourceIndex = index
                 )
                 return@forEachIndexed
             }
 
             if (action.isNullOrBlank() && isDiscoverDecorativeGroupKind(kind)) {
                 currentGroup = resolveDiscoverGroupTitle(kind)
+                currentGroupSourceIndex = index
                 return@forEachIndexed
             }
 
@@ -3047,7 +3051,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     kind = kind.copy(type = ExploreKind.Type.button, action = url),
                     text = resolveDiscoverTagText(kind).limitDiscoverText(6),
                     role = DiscoverTagItem.Role.ScriptUrl,
-                    group = null
+                    group = null,
+                    sourceIndex = index
                 )
                 return@forEachIndexed
             }
@@ -3063,7 +3068,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     kind = kind.copy(type = ExploreKind.Type.button),
                     text = resolveDiscoverControlText(kind).limitDiscoverText(8),
                     role = role,
-                    group = currentGroup
+                    group = currentGroup,
+                    sourceIndex = index,
+                    groupSourceIndex = currentGroupSourceIndex
                 )
                 return@forEachIndexed
             }
@@ -3073,7 +3080,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     kind = kind.copy(url = url),
                     text = resolveDiscoverTagText(kind).limitDiscoverText(6),
                     role = DiscoverTagItem.Role.UrlTag,
-                    group = currentGroup
+                    group = currentGroup,
+                    sourceIndex = index,
+                    groupSourceIndex = currentGroupSourceIndex
                 )
                 return@forEachIndexed
             }
@@ -3081,6 +3090,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             // 纯标题项(无 url、无 action、非控件):作为新分组的开始,自身不显示为选项。
             // 频道标题样式不全为全宽时也能正确分组,避免其后分类归错组或整项消失。
             currentGroup = resolveDiscoverGroupTitle(kind)
+            currentGroupSourceIndex = index
         }
         val hasMajorGroup = result.any { !it.group.isNullOrBlank() }
         val normalized = if (hasMajorGroup) {
@@ -3429,61 +3439,76 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         }
         data class RowAction(
             val row: io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow,
+            val sourceIndex: Int,
             val click: (Int) -> Unit
         )
         val actions = mutableListOf<RowAction>()
         if (discoverMajorGroups.isNotEmpty()) {
+            val channelSourceIndex = discoverAllTagItems
+                .asSequence()
+                .filter { it.group in discoverMajorGroups }
+                .map { it.groupSourceIndex }
+                .filter { it != Int.MAX_VALUE }
+                .minOrNull()
+                ?: discoverAllTagItems.minOfOrNull { it.sourceIndex }
+                ?: Int.MAX_VALUE
             actions += RowAction(
-                io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                row = io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
                     title = getString(R.string.discovery_channel),
                     options = discoverMajorGroups,
                     selectedIndex = discoverMajorGroups.indexOf(selectedDiscoverMajorGroup)
-                )
-            ) { optionIndex ->
-                discoverMajorGroups.getOrNull(optionIndex)?.let { group ->
-                    if (group != selectedDiscoverMajorGroup) {
-                        selectedDiscoverMajorGroup = group
-                        applyDiscoverTagFilterAndSelect(preferredUrl = null)
+                ),
+                sourceIndex = channelSourceIndex,
+                click = { optionIndex ->
+                    discoverMajorGroups.getOrNull(optionIndex)?.let { group ->
+                        if (group != selectedDiscoverMajorGroup) {
+                            selectedDiscoverMajorGroup = group
+                            applyDiscoverTagFilterAndSelect(preferredUrl = null)
+                        }
                     }
                 }
-            }
+            )
             val group = selectedDiscoverMajorGroup ?: discoverMajorGroups.first()
             val items = discoverAllTagItems.filter {
                 it.group == group && !it.isButton && !it.kind.url.isNullOrBlank()
             }
             if (items.isNotEmpty()) {
                 actions += RowAction(
-                    io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                    row = io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
                         title = getString(R.string.discovery_category),
                         options = items.map { it.text },
                         selectedIndex = items.indexOfFirst { it.kind.url == discoverCurrentUrl }
-                    )
-                ) { optionIndex ->
-                    items.getOrNull(optionIndex)?.let { item ->
-                        selectedDiscoverMajorGroup = group
-                        applyDiscoverTagFilterAndSelect(
-                            preferredUrl = item.kind.url,
-                            restoreGroupForPreferredUrl = true
-                        )
+                    ),
+                    sourceIndex = items.minOf { it.sourceIndex },
+                    click = { optionIndex ->
+                        items.getOrNull(optionIndex)?.let { item ->
+                            selectedDiscoverMajorGroup = group
+                            applyDiscoverTagFilterAndSelect(
+                                preferredUrl = item.kind.url,
+                                restoreGroupForPreferredUrl = true
+                            )
+                        }
                     }
-                }
+                )
             }
         } else {
             val items = discoverTagItems.filter { !it.isButton && !it.kind.url.isNullOrBlank() }
             if (items.isNotEmpty()) {
                 actions += RowAction(
-                    io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                    row = io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
                         title = getString(R.string.discovery_category),
                         options = items.map { it.text },
                         selectedIndex = items.indexOfFirst { it.kind.url == discoverCurrentUrl }
-                    )
-                ) { optionIndex ->
-                    items.getOrNull(optionIndex)?.let { item ->
-                        val index = discoverTagItems.indexOf(item)
-                        selectDiscoverTag(index, item, selectTab = false)
-                        renderModernDiscoveryFilterRows()
+                    ),
+                    sourceIndex = items.minOf { it.sourceIndex },
+                    click = { optionIndex ->
+                        items.getOrNull(optionIndex)?.let { item ->
+                            val index = discoverTagItems.indexOf(item)
+                            selectDiscoverTag(index, item, selectTab = false)
+                            renderModernDiscoveryFilterRows()
+                        }
                     }
-                }
+                )
             }
         }
         discoverSelectItems.forEach { item ->
@@ -3491,20 +3516,25 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             if (options.isNotEmpty()) {
                 val current = currentDiscoverSelectValue(item)
                 actions += RowAction(
-                    io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
+                    row = io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
                         title = item.text,
                         options = options,
                         selectedIndex = options.indexOf(current)
-                    )
-                ) { optionIndex ->
-                    options.getOrNull(optionIndex)?.let { value ->
-                        applyDiscoverSelectValue(item, value)
+                    ),
+                    sourceIndex = item.sourceIndex,
+                    click = { optionIndex ->
+                        options.getOrNull(optionIndex)?.let { value ->
+                            applyDiscoverSelectValue(item, value)
+                        }
                     }
-                }
+                )
             }
         }
-        submitDiscoverFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
-            actions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
+        // 新布局保留分组展示，但分类行按书源中的最早原始位置稳定排序，
+        // 避免固定“频道 -> 分类 -> select”改变经典列表布局的顺序。
+        val orderedActions = actions.sortedBy { it.sourceIndex }
+        submitDiscoverFilterRows(orderedActions.map { it.row }) { rowIndex, optionIndex ->
+            orderedActions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
         }
     }
 
