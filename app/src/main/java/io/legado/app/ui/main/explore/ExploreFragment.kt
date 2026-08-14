@@ -162,6 +162,7 @@ import kotlin.random.Random
 class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_explore),
     MainFragmentInterface,
     ExploreAdapter.CallBack,
+    ExploreShowAdapter.CallBack,
     ExploreShowBookCallback {
 
     constructor(position: Int) : this() {
@@ -1792,7 +1793,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val useComposeGrid = layoutMode == 3
         binding.composeDiscoverBooks.isVisible = useComposeGrid
         binding.rvDiscoverBooks.isGone = useComposeGrid
-        applyDiscoverBookContainerMargins(useComposeGrid)
+        applyDiscoverBookContainerMargins(layoutMode != 2)
         if (useComposeGrid) {
             binding.rvDiscoverBooks.removeItemDecoration(discoverListDivider)
             discoverBookLayoutMode = layoutMode
@@ -1817,7 +1818,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 addHeaderView { parent ->
                     val headerView = androidx.compose.ui.platform.ComposeView(parent.context).apply {
                         setViewCompositionStrategy(
-                            ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+                            ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool
                         )
                         setContent {
                             LegadoComposeTheme {

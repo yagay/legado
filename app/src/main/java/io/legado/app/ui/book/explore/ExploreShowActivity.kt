@@ -25,7 +25,7 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
  * 发现列表
  */
 class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreShowViewModel>(),
-    ExploreShowBookCallback {
+    ExploreShowAdapter.CallBack {
     override val binding by viewBinding(ActivityExploreShowBinding::inflate)
     override val viewModel by viewModels<ExploreShowViewModel>()
 
