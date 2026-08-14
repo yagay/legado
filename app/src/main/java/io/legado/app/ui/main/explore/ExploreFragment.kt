@@ -102,7 +102,6 @@ import io.legado.app.ui.widget.compose.showComposeConfirmDialog
 import io.legado.app.ui.widget.compose.showComposeMultiChoiceDialog
 import io.legado.app.ui.widget.compose.showComposeTextInputDialog
 import io.legado.app.utils.SearchBookMergeUtils
-import io.legado.app.utils.StringUtils
 import io.legado.app.utils.applyMainBottomBarPadding
 import io.legado.app.utils.applyStatusBarPadding
 import io.legado.app.utils.applyTint
@@ -2925,7 +2924,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val path = rows.mapNotNull { row ->
             row.options.getOrNull(row.selectedIndex)
                 // 路径中的分类名同样去掉首尾符号(如「玄幻」→玄幻),中间符号保留。
-                ?.let { StringUtils.stripWrapSymbols(it) }
+                ?.let { ModernDiscoveryText.stripWrapSymbols(it) }
                 ?.takeIf(String::isNotBlank)
         }.joinToString("  ›  ").takeIf { it.isNotBlank() }
         binding.topBar.setDiscoveryPath(path)
