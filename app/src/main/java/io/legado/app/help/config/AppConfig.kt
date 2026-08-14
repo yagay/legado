@@ -7,7 +7,6 @@ import io.legado.app.BuildConfig
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
-import io.legado.app.lib.theme.ThemeRuntimeKeys
 import io.legado.app.utils.GSON
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
 import io.legado.app.utils.fromJsonObject
@@ -956,10 +955,9 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
     val autoUpdateVariant get() = appCtx.getPrefBoolean("autoUpdateVariant", true)
-
-
 }
 
 internal fun normalizeJsSourceApiToken(value: String?): String? {
     return value?.trim()?.takeIf { it.isNotEmpty() }
 }
+
