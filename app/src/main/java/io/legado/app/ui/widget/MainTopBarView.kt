@@ -799,12 +799,12 @@ class MainTopBarView @JvmOverloads constructor(
      * 透明/毛玻璃背景同样交给 getToolbarTextColor 统一选择可读的黑色或白色。
      */
     /**
-     * 默认顶栏和现代发现页复用上游 TitleBar；只有用户主动选择自定义顶栏包时，
-     * 书架、订阅和阅读记录才保留自定义背景。
+     * 所有主页面统一按当前顶栏配置判断是否使用上游 TitleBar，
+     * 不再为现代发现页单独指定背景或前景色。
      */
     private fun usesUpstreamTitleBarStyle(): Boolean {
-        return mode == Mode.DISCOVERY ||
-            TopBarConfig.activeDirName(AppConfig.isNightTheme) == TopBarConfig.DEFAULT_DIR_NAME
+        return TopBarConfig.activeDirName(AppConfig.isNightTheme) ==
+            TopBarConfig.DEFAULT_DIR_NAME
     }
 
     private fun upstreamTitleBarBackground(): Drawable? {
