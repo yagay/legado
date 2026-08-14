@@ -5,6 +5,8 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import androidx.annotation.ColorInt
 import androidx.core.graphics.toColorInt
+import io.legado.app.help.config.AppConfig
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
 
 /**
@@ -14,7 +16,15 @@ import io.legado.app.utils.dpToPx
  * primaryTextColor/backgroundColor 等结果，不改变上游页面的主题行为。
  */
 val Context.titleTextColor: Int
-    get() = primaryTextColor
+    get() = AppConfig.titleFontColor.toThemeTextColorOrNull()
+        ?: defaultThemeTextColor(AppConfig.isNightTheme)
+
+val Context.configuredPrimaryTextColor: Int
+    get() = AppConfig.uiFontColor.toThemeTextColorOrNull()
+        ?: defaultThemeTextColor(AppConfig.isNightTheme)
+
+val Context.configuredSecondaryTextColor: Int
+    get() = ColorUtils.withAlpha(configuredPrimaryTextColor, 0.72f)
 
 @ColorInt
 fun String?.toThemeTextColorOrNull(): Int? {
