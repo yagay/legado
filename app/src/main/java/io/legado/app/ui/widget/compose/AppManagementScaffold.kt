@@ -37,7 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.legado.app.R
-import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.ManagementDisplayConfig
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.titleTextColor
@@ -109,7 +109,7 @@ private fun AppManagementTopBar(
     onBack: (() -> Unit)?
 ) {
     val context = LocalContext.current
-    val topBarColor = if (AppConfig.immersiveManageBar) {
+    val topBarColor = if (ManagementDisplayConfig.immersiveManageBar) {
         context.backgroundColor
     } else {
         context.primaryColor
