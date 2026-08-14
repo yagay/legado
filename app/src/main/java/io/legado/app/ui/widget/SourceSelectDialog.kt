@@ -109,7 +109,15 @@ object SourceSelectDialog {
                 }
             }
         }
+        val dialogWidth = minOf(
+            360.dpToPx(),
+            context.windowManager.windowSize.widthPixels - 32.dpToPx()
+        )
         val composeView = ComposeView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                dialogWidth,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent {
                 SourceSelectContent(
@@ -129,13 +137,16 @@ object SourceSelectDialog {
                 )
             }
         }
-        dialog.setContentView(composeView)
+        dialog.window?.setLayout(dialogWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
+        dialog.setContentView(
+            composeView,
+            ViewGroup.LayoutParams(dialogWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
+        )
         dialog.setOnShowListener {
-            val width = minOf(
-                360.dpToPx(),
-                context.windowManager.windowSize.widthPixels - 32.dpToPx()
-            )
-            dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+            // Some Android versions reset dialog attributes while attaching the window.
+            // Reapply the same value only as a compatibility fallback; the first
+            // measurement already uses dialogWidth through the content layout params.
+            dialog.window?.setLayout(dialogWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
             dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         }
         dialog.show()
