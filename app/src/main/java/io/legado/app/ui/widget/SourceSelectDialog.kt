@@ -320,7 +320,8 @@ private fun <T> SourceSelectContent(
                 ModernActionPopup.ModernMenu(
                     actions = data.actions,
                     anchorBounds = data.bounds,
-                    onDismiss = { menuState = null }
+                    onDismiss = { menuState = null },
+                    upstreamMenuStyle = true
                 )
             }
         }
