@@ -99,6 +99,7 @@ import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.ui.main.MainFragmentInterface
+import io.legado.app.ui.main.explore.modern.*
 import io.legado.app.ui.video.VideoBookPreloader
 import io.legado.app.ui.widget.ModernActionPopup
 import io.legado.app.ui.widget.RoundedTagBarView
@@ -136,7 +137,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -146,7 +146,6 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.withLock
@@ -4529,227 +4528,4 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         private const val SUITE_VISIBLE_COVER_PRELOAD_TIMEOUT_MS = 1800L
     }
 
-}
-
-private enum class DiscoverClassificationMode {
-    FLAT,
-    SECTION,
-    TREE
-}
-
-private data class DiscoverMatrixChannel(
-    val header: ExploreKind,
-    val categories: MutableList<DiscoverMatrixCategory>
-)
-
-private data class DiscoverMatrixCategory(
-    val header: ExploreKind,
-    val leaves: MutableList<ExploreKind>
-)
-
-private data class SuiteRandomDeck(
-    val signature: String,
-    val mutex: Mutex = Mutex(),
-    val queue: ArrayDeque<SearchBook> = ArrayDeque(),
-    val seenKeys: LinkedHashSet<String> = linkedSetOf(),
-    val nextPageByTarget: MutableMap<String, Int> = linkedMapOf(),
-    var targetIndex: Int = 0,
-    // Main 线程读、IO 线程写，加 @Volatile 保证可见性，避免重复预取。
-    @Volatile var prefetching: Boolean = false
-)
-
-private data class SuitePreparedBatch(
-    val signature: String,
-    val books: List<SearchBook>
-)
-
-private data class SuiteDeckPageRequest(
-    val tagUrl: String,
-    val page: Int,
-    val source: BookSource,
-    val seed: Int
-)
-
-private data class SuiteHorizontalPagingState(
-    val signature: String,
-    // nextPage/loading/exhausted 会被 Main(loadMore) 与 IO(首页加载) 访问，加 @Volatile 保证可见性。
-    @Volatile var nextPage: Int = 2,
-    @Volatile var loading: Boolean = false,
-    @Volatile var exhausted: Boolean = false
-)
-
-private data class SuiteRankedPagingState(
-    val signature: String,
-    // nextPage/loading/exhausted 会被 Main(loadMore) 与 IO(首页加载) 访问，加 @Volatile 保证可见性。
-    @Volatile var nextPage: Int = 2,
-    @Volatile var loading: Boolean = false,
-    @Volatile var exhausted: Boolean = false
-)
-
-private data class ModernDiscoverResultCache(
-    val sourceUrl: String = "",
-    val tagUrl: String = "",
-    val books: List<SearchBook> = emptyList(),
-    val nextPage: Int = 2,
-    val hasMore: Boolean = true,
-    val savedAt: Long = 0L
-)
-
-private data class DiscoverySuitePageSnapshot(
-    val suiteId: String,
-    val signature: String,
-    val widgetBooks: Map<String, List<SearchBook>>,
-    val rankedWidgetBooks: Map<String, Map<String, List<SearchBook>>>,
-    val widgetSignatures: Map<String, String>
-)
-
-private fun DiscoverySuitePageSnapshot.compactForCache(): DiscoverySuitePageSnapshot {
-    val incompleteWidgetIds = hashSetOf<String>()
-    val compactWidgetBooks = linkedMapOf<String, List<SearchBook>>()
-    widgetBooks.forEach { (widgetId, books) ->
-        val compactBooks = books.mapNotNull(DiscoveryCachePolicy::compact)
-        if (compactBooks.size != books.size) incompleteWidgetIds += widgetId
-        if (compactBooks.isNotEmpty()) compactWidgetBooks[widgetId] = compactBooks
-    }
-    val compactRankedWidgetBooks = linkedMapOf<String, Map<String, List<SearchBook>>>()
-    rankedWidgetBooks.forEach { (widgetId, rankedBooks) ->
-        val compactRankedBooks = linkedMapOf<String, List<SearchBook>>()
-        rankedBooks.forEach { (rank, books) ->
-            val compactBooks = books.mapNotNull(DiscoveryCachePolicy::compact)
-            if (compactBooks.size != books.size) incompleteWidgetIds += widgetId
-            if (compactBooks.isNotEmpty()) compactRankedBooks[rank] = compactBooks
-        }
-        if (compactRankedBooks.isNotEmpty()) {
-            compactRankedWidgetBooks[widgetId] = compactRankedBooks
-        }
-    }
-    return copy(
-        widgetBooks = compactWidgetBooks,
-        rankedWidgetBooks = compactRankedWidgetBooks,
-        widgetSignatures = widgetSignatures.filterKeys { it !in incompleteWidgetIds }
-    )
-}
-
-private fun DiscoverySuitePageSnapshot.hasBooks(): Boolean {
-    return widgetBooks.isNotEmpty() || rankedWidgetBooks.isNotEmpty()
-}
-
-private object DiscoverySuitePageSnapshotStore {
-    private const val MAX_SNAPSHOTS = 2
-    private val snapshots = object : LinkedHashMap<String, DiscoverySuitePageSnapshot>(
-        MAX_SNAPSHOTS,
-        0.75f,
-        true
-    ) {
-        override fun removeEldestEntry(
-            eldest: MutableMap.MutableEntry<String, DiscoverySuitePageSnapshot>
-        ): Boolean {
-            return size > MAX_SNAPSHOTS
-        }
-    }
-
-    @Synchronized
-    fun get(suiteId: String, signature: String): DiscoverySuitePageSnapshot? {
-        return snapshots[suiteId]?.takeIf { it.signature == signature }
-    }
-
-    @Synchronized
-    fun put(snapshot: DiscoverySuitePageSnapshot) {
-        if (snapshot.suiteId.isBlank()) return
-        snapshots[snapshot.suiteId] = snapshot
-    }
-
-}
-
-private object DiscoveryCacheWriteScope {
-    private val scope = CoroutineScope(SupervisorJob() + IO)
-    private var suiteSaveJob: Job? = null
-    private var suiteSaveVersion = 0L
-
-    @Synchronized
-    fun launchLatest(block: suspend CoroutineScope.(Long) -> Unit) {
-        val saveVersion = ++suiteSaveVersion
-        suiteSaveJob?.cancel()
-        suiteSaveJob = scope.launch { block(saveVersion) }
-    }
-
-    @Synchronized
-    fun isLatest(saveVersion: Long): Boolean = suiteSaveVersion == saveVersion
-}
-
-private const val DISCOVERY_SUITE_SNAPSHOT_RANDOM_LIMIT = 36
-private const val DISCOVERY_SUITE_SNAPSHOT_HORIZONTAL_LIMIT = 72
-private const val DISCOVERY_SUITE_SNAPSHOT_WATERFALL_LIMIT = 24
-private const val DISCOVERY_SUITE_SNAPSHOT_RANKED_TOTAL_LIMIT = 72
-private const val RANKED_SUITE_SNAPSHOT_BOOK_LIMIT = 24
-private const val DISCOVERY_SUITE_SNAPSHOT_WIDGET_LIMIT = 20
-private const val DISCOVERY_MODERN_CACHE_BOOK_LIMIT = 80
-private const val DISCOVERY_CACHE_TTL_MS = 72L * 60L * 60L * 1000L
-private const val DISCOVERY_CLASSIC_FLOW_COALESCE_DELAY_MS = 120L
-private const val DISCOVERY_MODERN_CACHE_PREFIX = "discovery_modern_result_"
-private const val DISCOVERY_SUITE_CACHE_PREFIX = "discovery_suite_snapshot_"
-
-private fun String.limitDiscoverText(max: Int): String {
-    return if (length <= max) this else "${take(max.coerceAtLeast(2) - 1)}..."
-}
-
-private fun DiscoverySuiteWidget.validRandomTargets(): List<DiscoverySuiteWidgetTarget> {
-    return targets.filter { it.sourceUrl.isNotBlank() && it.tagUrl.isNotBlank() }
-}
-
-private fun DiscoverySuite.cacheSignature(): String {
-    return widgets.joinToString(separator = "\u001D") { widget ->
-        "${widget.order}\u001C${widget.cacheSignature()}"
-    }
-}
-
-private fun DiscoverySuiteWidget.cacheSignature(): String {
-    return listOf(
-        id,
-        type,
-        displayLimit.toString(),
-        validRandomTargets().joinToString(separator = "\u001C") { it.deckKey() }
-    ).joinToString(separator = "\u001D")
-}
-
-private fun DiscoverySuiteWidget.snapshotBookLimit(): Int {
-    return when (type) {
-        DiscoverySuiteWidgetType.HorizontalBooks.value -> DISCOVERY_SUITE_SNAPSHOT_HORIZONTAL_LIMIT
-        DiscoverySuiteWidgetType.WaterfallBooks.value -> DISCOVERY_SUITE_SNAPSHOT_WATERFALL_LIMIT
-        DiscoverySuiteWidgetType.RankedList.value -> DISCOVERY_SUITE_SNAPSHOT_RANKED_TOTAL_LIMIT
-        else -> DISCOVERY_SUITE_SNAPSHOT_RANDOM_LIMIT
-    }
-}
-
-private fun DiscoverySuiteWidget.deckSignature(): String {
-    return validRandomTargets().joinToString("|") { it.deckKey() } + "|$displayLimit|$type"
-}
-
-private fun DiscoverySuiteWidget.horizontalPagingSignature(): String {
-    return validRandomTargets().firstOrNull()?.deckKey().orEmpty() + "|$type"
-}
-
-private fun DiscoverySuiteWidget.rankedPagingKey(target: DiscoverySuiteWidgetTarget): String {
-    return "$id\n${target.deckKey()}"
-}
-
-private fun DiscoverySuiteWidget.rankedPagingSignature(target: DiscoverySuiteWidgetTarget): String {
-    return "${target.deckKey()}|$type|$displayLimit"
-}
-
-private fun DiscoverySuiteWidgetTarget.deckKey(): String {
-    return "$sourceUrl\n$tagUrl"
-}
-
-private fun DiscoverySuiteWidget.isSuiteButtonOnlyWidget(): Boolean {
-    return type == DiscoverySuiteWidgetType.TagBar.value ||
-        type == DiscoverySuiteWidgetType.RankButtons.value
-}
-
-private fun SearchBook.suiteDeckKey(): String {
-    return when {
-        bookUrl.isNotBlank() -> "$origin|$bookUrl"
-        author.isNotBlank() -> "$origin|$name|$author"
-        else -> "$origin|$name"
-    }
 }
