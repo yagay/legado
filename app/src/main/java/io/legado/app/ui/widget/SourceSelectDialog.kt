@@ -64,7 +64,7 @@ import io.legado.app.R
 import io.legado.app.ui.widget.compose.ComposeLazyListFastScroller
 import io.legado.app.ui.widget.compose.LegadoMiuixCard
 import io.legado.app.ui.widget.compose.LegadoMiuixChoiceRow
-import io.legado.app.ui.widget.compose.rememberAppDialogStyle
+import io.legado.app.ui.widget.compose.rememberDefaultAppDialogStyle
 import io.legado.app.ui.widget.compose.toMiuixPalette
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.windowSize
@@ -157,7 +157,7 @@ private fun <T> SourceSelectContent(
     onDismiss: () -> Unit,
     onSelect: (T) -> Unit
 ) {
-    val style = rememberAppDialogStyle()
+    val style = rememberDefaultAppDialogStyle()
     val palette = style.toMiuixPalette()
     // 书源选择列表复用上游纵向菜单的表面色：普通行与面板同色，
     // 选中行仍保留主题强调色，搜索和快速滚动结构保持不变。
