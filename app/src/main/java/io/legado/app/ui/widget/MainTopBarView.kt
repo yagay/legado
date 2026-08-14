@@ -44,6 +44,7 @@ import io.legado.app.lib.theme.secondaryTextColor
 import io.legado.app.lib.theme.titleTextColor
 import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.lib.theme.uiTypeface
+import io.legado.app.ui.main.explore.modern.ModernDiscoveryUpstreamBridge
 import io.legado.app.ui.widget.compose.ComposeThemeImageLayer
 import io.legado.app.ui.widget.compose.ComposeThemeImageCrop
 import io.legado.app.ui.widget.compose.ComposeThemeImageState
@@ -795,12 +796,7 @@ class MainTopBarView @JvmOverloads constructor(
     }
 
     /**
-     * 复用列表模式 TitleBar 的顶栏前景色计算。覆盖式背景使用页面背景判断对比色，
-     * 透明/毛玻璃背景同样交给 getToolbarTextColor 统一选择可读的黑色或白色。
-     */
-    /**
-     * 所有主页面统一按当前顶栏配置判断是否使用上游 TitleBar，
-     * 不再为现代发现页单独指定背景或前景色。
+     * 默认样式直接复用上游 TitleBar；自定义顶栏包才保留扩展背景。
      */
     private fun usesUpstreamTitleBarStyle(): Boolean {
         return TopBarConfig.activeDirName(AppConfig.isNightTheme) ==
@@ -819,12 +815,10 @@ class MainTopBarView @JvmOverloads constructor(
     }
 
     private fun resolveToolbarForegroundColor(): Int {
-        val transparentBar = if (usesUpstreamTitleBarStyle()) {
-            !AppConfig.isEInkMode && context.transparentNavBar
-        } else {
-            !overlayOpaqueBackground
+        if (usesUpstreamTitleBarStyle()) {
+            return ModernDiscoveryUpstreamBridge.toolbarForegroundColor(context)
         }
-        return context.getToolbarTextColor(transparentBar)
+        return context.getToolbarTextColor(!overlayOpaqueBackground)
     }
 
     private fun applyToolbarForegroundColors() {
