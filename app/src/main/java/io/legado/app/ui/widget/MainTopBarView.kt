@@ -30,6 +30,7 @@ import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.MainLayoutPresetConfig
 import io.legado.app.help.config.TopBarConfig
 import io.legado.app.lib.theme.TopBarSearchStyle
 import io.legado.app.lib.theme.UiCorner
@@ -240,7 +241,8 @@ class MainTopBarView @JvmOverloads constructor(
     }
 
     private fun isFloatingSearchHidden(): Boolean {
-        return AppConfig.bottomBarLayoutMode == "floating" && AppConfig.floatingBottomBarHideSearch
+        return MainLayoutPresetConfig.bottomLayoutMode() == "floating" &&
+            MainLayoutPresetConfig.floatingBottomBarHideSearch()
     }
 
     fun isOverlayMode(): Boolean {
