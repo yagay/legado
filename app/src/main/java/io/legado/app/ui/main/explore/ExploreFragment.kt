@@ -146,7 +146,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.TimeUnit
-import kotlin.random.Random
 
 /**
  * 发现页面
@@ -219,8 +218,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val composeSuiteRankedWidgetBooks = mutableStateMapOf<String, Map<String, List<SearchBook>>>()
     private val composeSuiteLoadingWidgets = mutableStateMapOf<String, Boolean>()
     private val suiteRuntime = ModernDiscoverySuiteRuntime()
+    private val suiteLoader = ModernDiscoverySuiteLoader(suiteRuntime)
     private val suiteWidgetLoadSemaphore = Semaphore(SUITE_WIDGET_LOAD_PARALLELISM)
-    private val suiteTargetLoadSemaphore = Semaphore(SUITE_TARGET_LOAD_PARALLELISM)
     private val suiteCoverPreloadSemaphore = Semaphore(SUITE_COVER_PRELOAD_PARALLELISM)
     private var composeDiscoverCanScrollBackward = false
     private var composeSuiteCanScrollBackward = false
@@ -609,7 +608,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 composeSuiteLoadingWidgets[widget.id] = true
                 if (widget.type == DiscoverySuiteWidgetType.RankedList.value) {
                     val rankedBooks = try {
-                        withContext(IO) { loadSuiteRankedListWidgetBooks(widget) }
+                        withContext(IO) { suiteLoader.loadRankedListWidgetBooks(widget) }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
@@ -629,7 +628,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 }
                 composeSuiteRankedWidgetBooks.remove(widget.id)
                 val books = try {
-                    withContext(IO) { loadSuiteWidgetBooks(widget) }
+                    withContext(IO) { suiteLoader.loadWidgetBooks(widget) }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
@@ -723,175 +722,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         ModernDiscoveryCacheRepository.saveSuiteSnapshotAsync(snapshot)
     }
 
-    private suspend fun loadSuiteWidgetBooks(widget: DiscoverySuiteWidget): List<SearchBook> {
-        if (widget.type == DiscoverySuiteWidgetType.HorizontalBooks.value) {
-            return loadSuiteHorizontalWidgetBooks(widget)
-        }
-        val bookCount = when (widget.type) {
-            DiscoverySuiteWidgetType.WaterfallBooks.value -> WATERFALL_SUITE_BOOK_COUNT
-            else -> RANDOM_SUITE_BOOK_COUNT
-        }
-        val deck = suiteRuntime.randomDeck(widget)
-        val books = deck.mutex.withLock {
-            if (deck.queue.size < bookCount) {
-                fillSuiteRandomDeckLocked(
-                    widget = widget,
-                    deck = deck,
-                    minSize = maxOf(bookCount, RANDOM_SUITE_PREFETCH_COUNT)
-                )
-            }
-            val books = ArrayList<SearchBook>(bookCount)
-            while (books.size < bookCount && deck.queue.isNotEmpty()) {
-                books.add(deck.queue.removeFirst())
-            }
-            if (books.size < bookCount) {
-                fillSuiteRandomDeckLocked(widget, deck, bookCount)
-                while (books.size < bookCount && deck.queue.isNotEmpty()) {
-                    books.add(deck.queue.removeFirst())
-                }
-            }
-            books
-        }
-        if (books.isNotEmpty()) {
-            ModernDiscoveryDataRepository.persistSearchBooks(books)
-        }
-        return books
-    }
-
-    private suspend fun loadSuiteHorizontalWidgetBooks(widget: DiscoverySuiteWidget): List<SearchBook> {
-        val state = suiteRuntime.horizontalPagingState(widget)
-        state.nextPage = 2
-        state.exhausted = false
-        val target = widget.validRandomTargets().firstOrNull() ?: return emptyList()
-        val source = appDb.bookSourceDao.getBookSource(target.sourceUrl) ?: return emptyList()
-        val books = loadSuiteTargetPage(source, target.tagUrl, 1)
-            .distinctBy { it.suiteDeckKey() }
-            .take(HORIZONTAL_SUITE_PAGE_BOOK_LIMIT)
-        if (books.isNotEmpty()) {
-            ModernDiscoveryDataRepository.persistSearchBooks(books)
-        }
-        state.exhausted = books.isEmpty()
-        return books
-    }
-
-    private suspend fun loadSuiteRankedListWidgetBooks(
-        widget: DiscoverySuiteWidget
-    ): Map<String, List<SearchBook>> {
-        val result = linkedMapOf<String, List<SearchBook>>()
-        val entries = coroutineScope {
-            widget.validRandomTargets()
-            .take(RANKED_SUITE_TARGET_LIMIT)
-                .map { target ->
-                    async {
-                        val source = appDb.bookSourceDao.getBookSource(target.sourceUrl)
-                        val books = if (source == null) {
-                            emptyList()
-                        } else {
-                            loadSuiteTargetPage(source, target.tagUrl, 1)
-                                .distinctBy { it.suiteDeckKey() }
-                        }
-                        target to books
-                    }
-                }
-                .awaitAll()
-        }
-        entries.forEach { (target, books) ->
-            val state = suiteRuntime.rankedPagingState(widget, target)
-            state.nextPage = 2
-            state.exhausted = books.isEmpty()
-            result[target.deckKey()] = books
-        }
-        entries
-            .flatMap { it.second }
-            .takeIf { it.isNotEmpty() }
-            ?.let { ModernDiscoveryDataRepository.persistSearchBooks(it) }
-        return result
-    }
-
-    private suspend fun fillSuiteRandomDeckLocked(
-        widget: DiscoverySuiteWidget,
-        deck: SuiteRandomDeck,
-        minSize: Int
-    ) {
-        val targets = widget.validRandomTargets()
-        if (targets.isEmpty()) return
-        var attempts = 0
-        var resetSeen = false
-        while (deck.queue.size < minSize && attempts < RANDOM_SUITE_MAX_PREFETCH_ATTEMPTS) {
-            val requests = mutableListOf<SuiteDeckPageRequest>()
-            while (
-                requests.size < SUITE_RANDOM_BATCH_PARALLELISM &&
-                attempts < RANDOM_SUITE_MAX_PREFETCH_ATTEMPTS
-            ) {
-                attempts++
-                val target = targets[deck.targetIndex % targets.size]
-                deck.targetIndex += 1
-                val targetKey = target.deckKey()
-                val page = deck.nextPageByTarget[targetKey] ?: 1
-                deck.nextPageByTarget[targetKey] = if (page >= RANDOM_SUITE_MAX_PAGE) 1 else page + 1
-                val source = appDb.bookSourceDao.getBookSource(target.sourceUrl) ?: continue
-                val seed = "${widget.id}|$targetKey|$page|${deck.seenKeys.size}".hashCode()
-                requests += SuiteDeckPageRequest(
-                    tagUrl = target.tagUrl,
-                    page = page,
-                    source = source,
-                    seed = seed
-                )
-            }
-            if (requests.isEmpty()) continue
-            val loadedPages = coroutineScope {
-                requests.map { request ->
-                    async {
-                        request to loadSuiteTargetPage(request.source, request.tagUrl, request.page)
-                            .ifEmpty {
-                                if (request.page == 1) {
-                                    emptyList()
-                                } else {
-                                    loadSuiteTargetPage(request.source, request.tagUrl, 1)
-                                }
-                            }
-                    }
-                }.awaitAll()
-            }
-            var added = 0
-            loadedPages.forEach { (request, pageBooks) ->
-                pageBooks.shuffled(Random(request.seed)).forEach { book ->
-                    if (deck.queue.size >= minSize) return@forEach
-                    val key = book.suiteDeckKey()
-                    if (deck.seenKeys.add(key)) {
-                        deck.queue.addLast(book)
-                        added += 1
-                    }
-                }
-            }
-            if (added == 0 && !resetSeen && deck.queue.isEmpty() && attempts >= targets.size) {
-                deck.seenKeys.clear()
-                resetSeen = true
-            }
-        }
-    }
-
-    private suspend fun loadSuiteTargetPage(
-        source: BookSource,
-        tagUrl: String,
-        page: Int
-    ): List<SearchBook> {
-        return suiteTargetLoadSemaphore.withPermit {
-            try {
-                ModernDiscoveryDataRepository.loadExplorePage(
-                    source,
-                    tagUrl,
-                    page
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                AppLog.put("濂椾欢鍙戠幇鍔犺浇鍒嗙被澶辫触", e)
-                emptyList()
-            }
-        }
-    }
-
     private fun prefetchSuiteWidgetDeck(widget: DiscoverySuiteWidget) {
         if (!usingSuiteDiscovery ||
             widget.isSuiteButtonOnlyWidget() ||
@@ -905,7 +735,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             deck.prefetching = true
             try {
                 val queuedBooks = deck.mutex.withLock {
-                    fillSuiteRandomDeckLocked(widget, deck, RANDOM_SUITE_PREFETCH_COUNT)
+                    suiteLoader.fillRandomDeckLocked(widget, deck, RANDOM_SUITE_PREFETCH_COUNT)
                     deck.queue.take(RANDOM_SUITE_COVER_PREFETCH_COUNT)
                 }
                 withContext(Main) {
@@ -929,7 +759,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 composeSuiteLoadingWidgets[widget.id] = true
                 try {
                 val rankedBooks = try {
-                    withContext(IO) { loadSuiteRankedListWidgetBooks(widget) }
+                    withContext(IO) { suiteLoader.loadRankedListWidgetBooks(widget) }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
@@ -967,7 +797,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             composeSuiteLoadingWidgets[widget.id] = true
             try {
             val books = try {
-                withContext(IO) { loadSuiteWidgetBooks(widget) }
+                withContext(IO) { suiteLoader.loadWidgetBooks(widget) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -1008,7 +838,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             try {
             val books = try {
                 withContext(IO) {
-                    loadSuiteWidgetBooks(widget).also {
+                    suiteLoader.loadWidgetBooks(widget).also {
                         preloadSuiteVisibleCovers(appContext, widget, it)
                     }
                 }
@@ -1044,7 +874,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         viewLifecycleOwner.lifecycleScope.launch {
             try {
             val books = try {
-                withContext(IO) { loadSuiteHorizontalWidgetPage(widget, page) }
+                withContext(IO) { suiteLoader.loadHorizontalWidgetPage(widget, page) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -1094,7 +924,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         viewLifecycleOwner.lifecycleScope.launch {
             try {
             val books = try {
-                withContext(IO) { loadSuiteRankedWidgetPage(target, page) }
+                withContext(IO) { suiteLoader.loadRankedWidgetPage(target, page) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -1133,34 +963,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 state.loading = false
             }
         }
-    }
-
-    private suspend fun loadSuiteHorizontalWidgetPage(
-        widget: DiscoverySuiteWidget,
-        page: Int
-    ): List<SearchBook> {
-        val target = widget.validRandomTargets().firstOrNull() ?: return emptyList()
-        val source = appDb.bookSourceDao.getBookSource(target.sourceUrl) ?: return emptyList()
-        val books = loadSuiteTargetPage(source, target.tagUrl, page)
-            .distinctBy { it.suiteDeckKey() }
-            .take(HORIZONTAL_SUITE_PAGE_BOOK_LIMIT)
-        if (books.isNotEmpty()) {
-            ModernDiscoveryDataRepository.persistSearchBooks(books)
-        }
-        return books
-    }
-
-    private suspend fun loadSuiteRankedWidgetPage(
-        target: DiscoverySuiteWidgetTarget,
-        page: Int
-    ): List<SearchBook> {
-        val source = appDb.bookSourceDao.getBookSource(target.sourceUrl) ?: return emptyList()
-        val books = loadSuiteTargetPage(source, target.tagUrl, page)
-            .distinctBy { it.suiteDeckKey() }
-        if (books.isNotEmpty()) {
-            ModernDiscoveryDataRepository.persistSearchBooks(books)
-        }
-        return books
     }
 
     private fun prefetchSuiteCovers(books: List<SearchBook>) {
@@ -4287,20 +4089,13 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         private const val MAX_SUITE_SELECTOR_SOURCES = 80
         private const val MAX_SUITE_SELECTOR_TARGETS = 160
         private const val SUITE_WIDGET_LOAD_PARALLELISM = 4
-        private const val SUITE_TARGET_LOAD_PARALLELISM = 4
-        private const val SUITE_RANDOM_BATCH_PARALLELISM = 3
         private const val SUITE_COVER_PRELOAD_PARALLELISM = 4
         private const val RANDOM_SUITE_BOOK_COUNT = 6
         private const val RANDOM_SUITE_PREFETCH_COUNT = 18
         private const val RANDOM_SUITE_COVER_PREFETCH_COUNT = 18
-        private const val RANDOM_SUITE_MAX_PAGE = 5
-        private const val RANDOM_SUITE_MAX_PREFETCH_ATTEMPTS = 12
         private const val HORIZONTAL_SUITE_VISIBLE_COVER_COUNT = 3
-        private const val HORIZONTAL_SUITE_PAGE_BOOK_LIMIT = 18
         private const val HORIZONTAL_SUITE_MAX_BOOKS = 72
-        private const val RANKED_SUITE_TARGET_LIMIT = 9
         private const val RANKED_SUITE_VISIBLE_COVER_COUNT = 12
-        private const val WATERFALL_SUITE_BOOK_COUNT = 24
         private const val WATERFALL_SUITE_VISIBLE_COVER_COUNT = 8
         private const val SUITE_COVER_THUMB_WIDTH = 240
         private const val SUITE_COVER_THUMB_HEIGHT = 320
