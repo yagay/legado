@@ -1697,7 +1697,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private fun observeDiscoverBookshelf() {
         if (discoverBookshelfFlowJob?.isActive == true) return
         discoverBookshelfFlowJob = viewLifecycleOwner.lifecycleScope.launch {
-            appDb.bookDao.flowShelfIdentities()
+            appDb.bookDao.flowAll()
                 .flowWithLifecycleAndDatabaseChange(
                     viewLifecycleOwner.lifecycle,
                     Lifecycle.State.STARTED,
