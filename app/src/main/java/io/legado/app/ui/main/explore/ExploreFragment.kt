@@ -66,6 +66,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.TopBarConfig
 import io.legado.app.help.source.clearExploreKindsCache
 import io.legado.app.help.source.exploreKinds
+import io.legado.app.help.source.exploreKindsJson
 import io.legado.app.help.webView.WebViewPool
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
@@ -185,7 +186,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val discoverTagItems = mutableListOf<DiscoverTagItem>()
     private val discoverSelectItems = mutableListOf<DiscoverTagItem>()
     private val discoverMajorGroups = mutableListOf<String>()
-    private var discoverKindTree: List<ExploreKind> = emptyList()
+    private var discoverKindTree: List<ModernExploreNode> = emptyList()
     private val discoverTreeSelections = mutableMapOf<Int, String>()
     private val discoverBookshelf = linkedSetOf<String>()
     private val discoverBooks = linkedSetOf<SearchBook>()
@@ -2464,12 +2465,20 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val kinds = withContext(IO) {
             source.exploreKinds()
         }
-        discoverKindTree = buildDiscoverSectionMatrixTree(kinds) ?: kinds
+        val parsedTree = withContext(IO) {
+            ModernDiscoveryCategoryTree.parse(source.exploreKindsJson())
+        }
+        val modernKinds = parsedTree
+            .takeIf { it.hasDiscoverChildren() }
+            ?: ModernExploreNode.leaves(kinds)
+        discoverKindTree = buildDiscoverSectionMatrixTree(modernKinds) ?: modernKinds
         discoverClassificationMode = detectDiscoverClassificationMode(discoverKindTree)
         if (usingModernDiscovery && discoverClassificationMode == DiscoverClassificationMode.TREE) {
             val rootControls = buildDiscoverTagItems(
                 source,
-                kinds.filter { it.children.isNullOrEmpty() && it.type != ExploreKind.Type.url }
+                discoverKindTree
+                    .filter { it.children.isEmpty() && it.kind.type != ExploreKind.Type.url }
+                    .map { it.kind }
             )
             discoverAllTagItems.clear()
             discoverTagItems.clear()
@@ -3052,7 +3061,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val actions = mutableListOf<TreeRowAction>()
         var levelItems = discoverKindTree
         var inheritedTitle: String? = null
-        var lastValidNode: ExploreKind? = null
+        var lastValidNode: ModernExploreNode? = null
         var level = 0
         var steps = 0
         val safetyLimit = (countDiscoverKinds(discoverKindTree) + 1).coerceAtLeast(16)
@@ -3061,18 +3070,16 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             while (
                 levelItems.size == 1 &&
                 levelItems.first().discoverTargetUrl().isNullOrBlank() &&
-                !levelItems.first().children.isNullOrEmpty()
+                levelItems.first().children.isNotEmpty()
             ) {
                 val container = levelItems.first()
                 inheritedTitle = cleanDiscoverTitle(container.title).ifBlank { inheritedTitle.orEmpty() }
-                levelItems = container.children.orEmpty()
+                levelItems = container.children
             }
             if (levelItems.isEmpty()) break
 
             val visibleItems = levelItems.filter {
-                // 放宽过滤:仅要求节点可展开或有目标 URL;
-                // 标题为空/纯符号时用 discoverKindDisplayTitle 兜底,避免整行缺失。
-                !it.children.isNullOrEmpty() || !it.discoverTargetUrl().isNullOrBlank()
+                it.children.isNotEmpty() || !it.discoverTargetUrl().isNullOrBlank()
             }
             if (visibleItems.isEmpty()) break
             val selectedTitle = discoverTreeSelections[level]
@@ -3084,7 +3091,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             actions += TreeRowAction(
                 row = io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
                     title = inferDiscoverSelectorTitle(rowLevel, visibleItems, inheritedTitle),
-                    options = visibleItems.map { discoverKindDisplayTitle(it) },
+                    options = visibleItems.map(::discoverKindDisplayTitle),
                     selectedIndex = visibleItems.indexOfFirst { it.title == selectedTitle }
                 ),
                 click = { optionIndex ->
@@ -3104,10 +3111,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
             val selected = visibleItems.firstOrNull { it.title == selectedTitle } ?: break
             selected.discoverTargetUrl()?.let { url ->
-                lastValidNode = selected.copy(url = url, action = null)
+                lastValidNode = selected.copy(
+                    kind = selected.kind.copy(url = url, action = null)
+                )
             }
             inheritedTitle = selected.title
-            levelItems = selected.children.orEmpty()
+            levelItems = selected.children
             level++
         }
 
@@ -3133,20 +3142,19 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         submitDiscoverFilterRows(actions.map { it.row }) { rowIndex, optionIndex ->
             actions.getOrNull(rowIndex)?.click?.invoke(optionIndex)
         }
-        if (loadSelectedUrl && lastValidNode != null) {
-            selectModernDiscoverTreeNode(lastValidNode!!)
+        if (loadSelectedUrl) {
+            lastValidNode?.let(::selectModernDiscoverTreeNode)
         }
     }
 
-    private fun selectModernDiscoverTreeNode(kind: ExploreKind) {
-        val url = kind.discoverTargetUrl()?.takeIf { it.isNotBlank() } ?: return
+    private fun selectModernDiscoverTreeNode(node: ModernExploreNode) {
+        val url = node.discoverTargetUrl()?.takeIf { it.isNotBlank() } ?: return
+        val kind = node.kind
         val item = DiscoverTagItem(
             kind = kind.copy(url = url, action = null, type = ExploreKind.Type.url),
             text = cleanDiscoverTitle(kind.title),
             role = DiscoverTagItem.Role.UrlTag
         )
-        // 树形筛选没有旧标签栏索引，但仍统一进入主项目标准 URL 标签选择链，
-        // 保证当前 URL、持久化、请求取消和书籍加载状态完全一致。
         selectDiscoverTag(index = -1, item = item, selectTab = false)
     }
 
@@ -3175,7 +3183,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private fun restoreDiscoverTreeSelectionsAtLevel(
-        originalKinds: List<ExploreKind>,
+        originalKinds: List<ModernExploreNode>,
         targetUrl: String,
         level: Int
     ): Boolean {
@@ -3183,26 +3191,26 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         while (
             kinds.size == 1 &&
             kinds.first().discoverTargetUrl().isNullOrBlank() &&
-            !kinds.first().children.isNullOrEmpty()
+            kinds.first().children.isNotEmpty()
         ) {
-            kinds = kinds.first().children.orEmpty()
+            kinds = kinds.first().children
         }
         val selected = kinds.firstOrNull { it.containsDiscoverTarget(targetUrl) } ?: return false
         discoverTreeSelections[level] = selected.title
         if (selected.discoverTargetUrl() == targetUrl) return true
-        return restoreDiscoverTreeSelectionsAtLevel(selected.children.orEmpty(), targetUrl, level + 1)
+        return restoreDiscoverTreeSelectionsAtLevel(selected.children, targetUrl, level + 1)
     }
 
-    private fun ExploreKind.containsDiscoverTarget(targetUrl: String): Boolean {
-        return discoverTargetUrl() == targetUrl || children.orEmpty().any { it.containsDiscoverTarget(targetUrl) }
+    private fun ModernExploreNode.containsDiscoverTarget(targetUrl: String): Boolean {
+        return discoverTargetUrl() == targetUrl || children.any { it.containsDiscoverTarget(targetUrl) }
     }
 
     private fun inferDiscoverSelectorTitle(
         level: Int,
-        items: List<ExploreKind>,
+        items: List<ModernExploreNode>,
         inheritedTitle: String?
     ): String {
-        val titles = items.map { discoverKindDisplayTitle(it) }
+        val titles = items.map(::discoverKindDisplayTitle)
         if (titles.any {
                 it.contains("男频") || it.contains("女频") ||
                     it.contains("男生频道") || it.contains("女生频道")
@@ -3241,12 +3249,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             .trim()
     }
 
-    /**
-     * 树形分类节点的显示标题:清理符号后为空时兜底到类型名,
-     * 保证每层总有可显示的选项文本(与拍平模式的 resolveDiscoverTagText 行为一致)。
-     */
-    private fun discoverKindDisplayTitle(kind: ExploreKind): String {
-        return cleanDiscoverTitle(kind.title).ifBlank { kind.type }
+    private fun discoverKindDisplayTitle(node: ModernExploreNode): String {
+        return cleanDiscoverTitle(node.kind.title).ifBlank { node.kind.type }
     }
 
     private fun ExploreKind.discoverTargetUrl(): String? {
@@ -3255,36 +3259,36 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             ?: normalizedDiscoverUrl()
     }
 
-    private fun List<ExploreKind>.hasDiscoverChildren(): Boolean {
-        return any { !it.children.isNullOrEmpty() || it.children.orEmpty().hasDiscoverChildren() }
+    private fun ModernExploreNode.discoverTargetUrl(): String? = kind.discoverTargetUrl()
+
+    private fun List<ModernExploreNode>.hasDiscoverChildren(): Boolean {
+        return any { it.children.isNotEmpty() || it.children.hasDiscoverChildren() }
     }
 
-    private fun countDiscoverKinds(kinds: List<ExploreKind>): Int {
-        return kinds.sumOf { 1 + countDiscoverKinds(it.children.orEmpty()) }
+    private fun countDiscoverKinds(kinds: List<ModernExploreNode>): Int {
+        return kinds.sumOf { 1 + countDiscoverKinds(it.children) }
     }
 
-    private fun detectDiscoverClassificationMode(kinds: List<ExploreKind>): DiscoverClassificationMode {
+    private fun detectDiscoverClassificationMode(
+        kinds: List<ModernExploreNode>
+    ): DiscoverClassificationMode {
         if (kinds.hasDiscoverChildren()) return DiscoverClassificationMode.TREE
-        if (kinds.any { isDiscoverMajorGroupKind(it) || isDiscoverDecorativeGroupKind(it) }) {
+        if (kinds.any { isDiscoverMajorGroupKind(it.kind) || isDiscoverDecorativeGroupKind(it.kind) }) {
             return DiscoverClassificationMode.SECTION
         }
         return DiscoverClassificationMode.FLAT
     }
 
-    /**
-     * 部分旧书源用全宽无 URL 项目表达“频道/分类”标题，再用连续 URL 项目表达
-     * “榜单 × 状态”的组合。先还原成频道 -> 分类 -> 状态 -> 榜单树，后续统一
-     * 交给动态树渲染；无法确认是这种结构时返回 null，继续使用原项目分段逻辑。
-     */
-    private fun buildDiscoverSectionMatrixTree(kinds: List<ExploreKind>): List<ExploreKind>? {
+    private fun buildDiscoverSectionMatrixTree(
+        kinds: List<ModernExploreNode>
+    ): List<ModernExploreNode>? {
         val channels = mutableListOf<DiscoverMatrixChannel>()
         var currentChannel: DiscoverMatrixChannel? = null
         var currentCategory: DiscoverMatrixCategory? = null
 
-        kinds.forEach { kind ->
-            // 节点自带 children 的为真实树形结构,跳过矩阵重建,
-            // 避免树节点被当作标题行处理导致其子分类全部丢失。
-            if (!kind.children.isNullOrEmpty()) return@forEach
+        kinds.forEach { node ->
+            if (node.children.isNotEmpty()) return@forEach
+            val kind = node.kind
             val targetUrl = kind.discoverTargetUrl()
             val isHeader = targetUrl.isNullOrBlank() &&
                 kind.action.isNullOrBlank() &&
@@ -3312,16 +3316,17 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         if (channels.size < 2 || channels.any { it.categories.isEmpty() }) return null
         val rebuiltChannels = channels.mapNotNull { channel ->
             val categories = channel.categories.mapNotNull(::buildDiscoverMatrixCategory)
-            if (categories.isEmpty()) null else channel.header.copy(
-                url = null,
-                action = null,
+            if (categories.isEmpty()) null else ModernExploreNode(
+                kind = channel.header.copy(url = null, action = null),
                 children = categories
             )
         }
         return rebuiltChannels.takeIf { it.size >= 2 }
     }
 
-    private fun buildDiscoverMatrixCategory(category: DiscoverMatrixCategory): ExploreKind? {
+    private fun buildDiscoverMatrixCategory(
+        category: DiscoverMatrixCategory
+    ): ModernExploreNode? {
         val rankOrder = mutableListOf<String>()
         val statusOrder = mutableListOf<String>()
         val combinations = linkedMapOf<String, LinkedHashMap<String, ExploreKind>>()
@@ -3344,16 +3349,15 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         if (statusOrder.any { combinations[it].orEmpty().size < 2 }) return null
         val statusNodes = statusOrder.mapNotNull { status ->
             val rankLeaves = rankOrder.mapNotNull { rank ->
-                combinations[status]?.get(rank)?.copy(title = rank, children = null)
-            }
-            if (rankLeaves.isEmpty()) null else ExploreKind(
-                title = status,
+                combinations[status]?.get(rank)?.copy(title = rank)
+            }.map { ModernExploreNode(it) }
+            if (rankLeaves.isEmpty()) null else ModernExploreNode(
+                kind = ExploreKind(title = status),
                 children = rankLeaves
             )
         }
-        return category.header.copy(
-            url = null,
-            action = null,
+        return ModernExploreNode(
+            kind = category.header.copy(url = null, action = null),
             children = statusNodes
         )
     }
