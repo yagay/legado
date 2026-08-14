@@ -32,6 +32,7 @@ import androidx.lifecycle.Lifecycle
 import io.legado.app.R
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.BookshelfDisplayConfig
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListItemStyle
 import io.legado.app.ui.main.bookshelf.compose.BookshelfListPalette
 import io.legado.app.ui.main.bookshelf.compose.rememberBookshelfListRenderConfig
@@ -63,7 +64,7 @@ fun ExploreShowComposeScreen(
 ) {
     val renderConfig = rememberBookshelfListRenderConfig()
     val palette = renderConfig.palette
-    val rounded = AppConfig.bookshelfListItemStyle == BookshelfListItemStyle.RoundedCard
+    val rounded = BookshelfDisplayConfig.listItemStyle == BookshelfListItemStyle.RoundedCard
     val listState = rememberLazyListState()
     var previewState by remember { mutableStateOf<SearchBookPreviewState?>(null) }
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
