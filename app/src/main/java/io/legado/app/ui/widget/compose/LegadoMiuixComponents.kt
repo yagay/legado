@@ -616,6 +616,7 @@ fun LegadoMiuixChoiceRow(
     minHeight: Dp = 40.dp,
     compact: Boolean = false,
     horizontalPadding: Dp? = null,
+    verticalPadding: Dp? = null,
     showSelectedMark: Boolean = true,
     enabled: Boolean = true,
     leadingIconName: String? = null,
@@ -648,7 +649,7 @@ fun LegadoMiuixChoiceRow(
                 .heightIn(min = minHeight)
                 .padding(
                     horizontal = horizontalPadding ?: if (compact) 11.dp else 13.dp,
-                    vertical = if (compact) 6.dp else 9.dp
+                    vertical = verticalPadding ?: if (compact) 6.dp else 9.dp
                 ),
             verticalAlignment = Alignment.CenterVertically
         ) {
