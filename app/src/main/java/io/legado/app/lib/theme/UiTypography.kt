@@ -23,7 +23,7 @@ private fun Context.baseSystemTypeface(): Typeface {
 }
 
 fun Context.uiTypeface(): Typeface {
-    val fontPath = AppConfig.uiFontPath
+    val fontPath = ThemeTypographyConfig.uiFontPath
     if (fontPath.isNotBlank()) {
         loadUiTypeface(fontPath)?.let {
             return it
@@ -33,7 +33,7 @@ fun Context.uiTypeface(): Typeface {
 }
 
 fun Context.titleTypeface(): Typeface {
-    val fontPath = AppConfig.titleFontPath
+    val fontPath = ThemeTypographyConfig.titleFontPath
     if (fontPath.isNotBlank()) {
         loadUiTypeface(fontPath)?.let {
             return it
