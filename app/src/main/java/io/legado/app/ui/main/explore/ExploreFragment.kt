@@ -3444,13 +3444,15 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         )
         val actions = mutableListOf<RowAction>()
         if (discoverMajorGroups.isNotEmpty()) {
-            val channelSourceIndex = discoverAllTagItems
+            val groupedItems = discoverAllTagItems.filter {
+                it.group != null && it.group in discoverMajorGroups
+            }
+            val channelSourceIndex = groupedItems
                 .asSequence()
-                .filter { it.group != null && it.group in discoverMajorGroups }
                 .map { it.groupSourceIndex }
                 .filter { it != Int.MAX_VALUE }
                 .minOrNull()
-                ?: discoverAllTagItems.minOfOrNull { it.sourceIndex }
+                ?: groupedItems.minOfOrNull { it.sourceIndex }
                 ?: Int.MAX_VALUE
             actions += RowAction(
                 row = io.legado.app.ui.widget.MainTopBarView.DiscoveryFilterRow(
