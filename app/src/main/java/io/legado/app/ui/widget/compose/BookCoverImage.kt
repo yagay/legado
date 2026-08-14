@@ -63,6 +63,7 @@ import io.legado.app.lib.theme.secondaryTextColor
 import io.legado.app.lib.theme.titleTextColor
 import io.legado.app.model.BookCover
 import io.legado.app.ui.widget.image.CoverImageView
+import io.legado.app.ui.widget.image.CoverStyle
 import io.legado.app.utils.textHeight
 import io.legado.app.utils.toStringArray
 import kotlin.math.roundToInt
@@ -78,7 +79,7 @@ private var cachedDefaultBitmap: Bitmap? = null
 fun BookCoverImage(
     book: Book,
     modifier: Modifier = Modifier,
-    style: CoverImageView.CoverStyle = CoverImageView.CoverStyle.LIST,
+    style: CoverStyle = CoverStyle.LIST,
     loadOnlyWifi: Boolean = AppConfig.loadCoverOnlyWifi,
     fragment: Fragment? = null,
     lifecycle: Lifecycle? = null,
@@ -119,7 +120,7 @@ fun BookCoverImage(
 fun BookCoverImage(
     book: SearchBook,
     modifier: Modifier = Modifier,
-    style: CoverImageView.CoverStyle = CoverImageView.CoverStyle.LIST,
+    style: CoverStyle = CoverStyle.LIST,
     loadOnlyWifi: Boolean = AppConfig.loadCoverOnlyWifi,
     fragment: Fragment? = null,
     lifecycle: Lifecycle? = null,
@@ -163,7 +164,7 @@ fun BookCoverImage(
     author: String?,
     sourceOrigin: String?,
     modifier: Modifier = Modifier,
-    style: CoverImageView.CoverStyle = CoverImageView.CoverStyle.LIST,
+    style: CoverStyle = CoverStyle.LIST,
     loadOnlyWifi: Boolean = AppConfig.loadCoverOnlyWifi,
     fragment: Fragment? = null,
     lifecycle: Lifecycle? = null,
@@ -341,7 +342,7 @@ fun BookCoverImage(
 }
 
 private fun Modifier.coverOuterShadow(
-    style: CoverImageView.CoverStyle,
+    style: CoverStyle,
     enabled: Boolean
 ): Modifier {
     if (!enabled || style.elevationDp <= 0f) return this
