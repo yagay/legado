@@ -252,6 +252,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private var discoverSourceVersion = 0L
     private var discoveryModeLoaded = false
     private var modernTopOverlaySpace = -1
+    private var discoverFilterScrollY = 0
     private var discoverDefaultFiltersAppliedKey: String? = null
     private var discoverClassificationMode = DiscoverClassificationMode.FLAT
 
@@ -322,6 +323,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     onLoadMore = { loadDiscoverBooks(reset = false) },
                     onCanScrollBackwardChanged = {
                         composeDiscoverCanScrollBackward = it
+                    },
+                    onFilterHeaderHiddenChanged = { hidden ->
+                        binding.topBar.setDiscoveryFiltersCollapsed(hidden)
                     },
                     fragment = this@ExploreFragment,
                     lifecycle = viewLifecycleOwner.lifecycle
@@ -1740,8 +1744,14 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.rvDiscoverBooks.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
+                discoverFilterScrollY = if (recyclerView.canScrollVertically(-1)) {
+                    (discoverFilterScrollY + dy).coerceAtLeast(0)
+                } else {
+                    0
+                }
+                val collapseThreshold = binding.topBar.discoveryFilterCollapseThreshold()
                 binding.topBar.setDiscoveryFiltersCollapsed(
-                    recyclerView.canScrollVertically(-1)
+                    collapseThreshold > 0 && discoverFilterScrollY >= collapseThreshold
                 )
                 if (dy > 0 && !recyclerView.canScrollVertically(1)) {
                     loadDiscoverBooks(reset = false)
@@ -4070,6 +4080,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         if (!reset && !discoverHasMore) return
         if (reset) {
             discoverLoadJob?.cancel()
+            discoverFilterScrollY = 0
             binding.topBar.setDiscoveryFiltersCollapsed(false)
             if (binding.composeDiscoverBooks.isVisible) {
                 composeDiscoverScrollToTopSignal.intValue++
