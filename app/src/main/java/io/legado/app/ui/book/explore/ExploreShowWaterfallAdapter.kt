@@ -17,6 +17,8 @@ import io.legado.app.lib.theme.themeCardColorOrDefault
 import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.ui.widget.WaterfallCardMetrics
 import io.legado.app.ui.widget.image.CoverImageView
+import io.legado.app.ui.widget.image.CoverStyle
+import io.legado.app.ui.widget.image.setCoverStyle
 import io.legado.app.utils.gone
 import io.legado.app.utils.visible
 
@@ -80,7 +82,7 @@ class ExploreShowWaterfallAdapter(
                 llKind.visible()
                 llKind.setLabels(kinds.take(4))
             }
-            ivCover.setCoverStyle(CoverImageView.CoverStyle.GRID)
+            ivCover.setCoverStyle(CoverStyle.GRID)
             ivCover.load(item, AppConfig.loadCoverOnlyWifi)
         }
     }
