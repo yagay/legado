@@ -50,7 +50,7 @@ import io.legado.app.ui.widget.compose.ComposeThemeImageState
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.ImageTypeUtils
 import io.legado.app.utils.StatusBarInsetAware
-import io.legado.app.utils.StringUtils
+import io.legado.app.ui.main.explore.modern.ModernDiscoveryText
 
 class MainTopBarView @JvmOverloads constructor(
     context: Context,
@@ -391,7 +391,7 @@ class MainTopBarView @JvmOverloads constructor(
 
         fun optionView(optionIndex: Int) = TextView(context).apply {
             // 分类名首尾带符号时只显示去掉符号的文本,如「玄幻」→玄幻;post 测量复用本函数,宽度自动一致。
-            text = StringUtils.stripWrapSymbols(row.options[optionIndex])
+            text = ModernDiscoveryText.stripWrapSymbols(row.options[optionIndex])
             textSize = 14f
             gravity = Gravity.CENTER
             maxLines = 1
