@@ -27,10 +27,33 @@ internal class ModernDiscoverySuiteRuntime {
             randomDecks.clear()
         }
         preparedRandomBatches.clear()
-        randomPrepareJobs.values.forEach(Job::cancel)
+        randomPrepareJobs.values.forEach { it.cancel() }
         randomPrepareJobs.clear()
         horizontalPagingStates.clear()
         rankedPagingStates.clear()
+    }
+
+    fun retainWidgets(widgetIds: Set<String>) {
+        widgetSignatures.keys
+            .filterNot { it in widgetIds }
+            .forEach { widgetSignatures.remove(it) }
+        synchronized(randomDecks) {
+            randomDecks.keys
+                .filterNot { it in widgetIds }
+                .forEach { randomDecks.remove(it) }
+        }
+        preparedRandomBatches.keys
+            .filterNot { it in widgetIds }
+            .forEach { preparedRandomBatches.remove(it) }
+        randomPrepareJobs.keys
+            .filterNot { it in widgetIds }
+            .forEach { randomPrepareJobs.remove(it)?.cancel() }
+        horizontalPagingStates.keys
+            .filterNot { it in widgetIds }
+            .forEach { horizontalPagingStates.remove(it) }
+        rankedPagingStates.keys
+            .filterNot { key -> key.substringBefore('\n') in widgetIds }
+            .forEach { rankedPagingStates.remove(it) }
     }
 
     fun randomDeck(widget: DiscoverySuiteWidget): SuiteRandomDeck {
