@@ -29,9 +29,6 @@ import java.net.InetAddress
 
 @Suppress("MemberVisibilityCanBePrivate", "ConstPropertyName")
 object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
-    const val DISCOVERY_PAGE_MODE_LEGACY = "legacy"
-    const val DISCOVERY_PAGE_MODE_MODERN = "modern"
-    const val DISCOVERY_PAGE_MODE_SUITE = "suite"
     const val DEFAULT_FAST_SCROLLER_TOUCH_TARGET_DP = 44
     const val MIN_FAST_SCROLLER_TOUCH_TARGET_DP = 32
     const val MAX_FAST_SCROLLER_TOUCH_TARGET_DP = 60
@@ -966,72 +963,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val immersiveManageBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.immersiveManageBar, true)
-
-    var discoveryPageMode: String
-        get() = when (val value = appCtx.getPrefString(PreferKey.discoveryPageMode)) {
-            DISCOVERY_PAGE_MODE_LEGACY, DISCOVERY_PAGE_MODE_MODERN -> value
-            DISCOVERY_PAGE_MODE_SUITE -> DISCOVERY_PAGE_MODE_MODERN
-            else -> DISCOVERY_PAGE_MODE_LEGACY
-        }
-        set(value) {
-            val normalized = value.takeIf {
-                it == DISCOVERY_PAGE_MODE_LEGACY || it == DISCOVERY_PAGE_MODE_MODERN
-            } ?: DISCOVERY_PAGE_MODE_LEGACY
-            appCtx.putPrefString(PreferKey.discoveryPageMode, normalized)
-            appCtx.putPrefBoolean(PreferKey.modernDiscoveryPage, normalized != DISCOVERY_PAGE_MODE_LEGACY)
-        }
-
-    val modernDiscoveryPage: Boolean
-        get() = discoveryPageMode != DISCOVERY_PAGE_MODE_LEGACY
-
-    var discoveryPageLayout: Int
-        get() = appCtx.getPrefInt(PreferKey.discoveryPageLayout, 1).coerceIn(1, 3)
-        set(value) = appCtx.putPrefInt(PreferKey.discoveryPageLayout, value.coerceIn(1, 3))
-
-    var modernDiscoverySourceUrl: String?
-        get() = appCtx.getPrefString(PreferKey.modernDiscoverySourceUrl)
-        set(value) {
-            if (value.isNullOrBlank()) appCtx.removePref(PreferKey.modernDiscoverySourceUrl)
-            else appCtx.putPrefString(PreferKey.modernDiscoverySourceUrl, value)
-        }
-
-    fun modernDiscoveryTagUrl(sourceUrl: String?): String? {
-        val key = sourceUrl?.takeIf { it.isNotBlank() } ?: return null
-        return modernDiscoveryTagUrlMap()[key]?.takeIf { it.isNotBlank() }
-    }
-
-    fun rememberModernDiscoveryTagUrl(sourceUrl: String?, tagUrl: String?) {
-        val key = sourceUrl?.takeIf { it.isNotBlank() } ?: return
-        val values = modernDiscoveryTagUrlMap().toMutableMap()
-        tagUrl?.takeIf { it.isNotBlank() }?.let { values[key] = it } ?: values.remove(key)
-        if (values.isEmpty()) appCtx.removePref(PreferKey.modernDiscoveryTagUrls)
-        else appCtx.putPrefString(PreferKey.modernDiscoveryTagUrls, GSON.toJson(values))
-    }
-
-    private fun modernDiscoveryTagUrlMap(): Map<String, String> =
-        GSON.fromJsonObject<Map<String, String>>(
-            appCtx.getPrefString(PreferKey.modernDiscoveryTagUrls)
-        ).getOrDefault(emptyMap()).filterKeys { it.isNotBlank() }.filterValues { it.isNotBlank() }
-
-    fun modernDiscoveryTreeSelections(sourceUrl: String?): List<String> {
-        val key = sourceUrl?.takeIf { it.isNotBlank() } ?: return emptyList()
-        return modernDiscoveryTreeSelectionMap()[key].orEmpty().filter { it.isNotBlank() }
-    }
-
-    fun rememberModernDiscoveryTreeSelections(sourceUrl: String?, selections: List<String>) {
-        val key = sourceUrl?.takeIf { it.isNotBlank() } ?: return
-        val values = modernDiscoveryTreeSelectionMap().toMutableMap()
-        selections.filter { it.isNotBlank() }.takeIf { it.isNotEmpty() }
-            ?.let { values[key] = it }
-            ?: values.remove(key)
-        if (values.isEmpty()) appCtx.removePref(PreferKey.modernDiscoveryTreeSelections)
-        else appCtx.putPrefString(PreferKey.modernDiscoveryTreeSelections, GSON.toJson(values))
-    }
-
-    private fun modernDiscoveryTreeSelectionMap(): Map<String, List<String>> =
-        GSON.fromJsonObject<Map<String, List<String>>>(
-            appCtx.getPrefString(PreferKey.modernDiscoveryTreeSelections)
-        ).getOrDefault(emptyMap()).filterKeys { it.isNotBlank() }
 
     var bookshelfListItemStyle: Int
         get() = appCtx.getPrefInt(PreferKey.bookshelfListItemStyle, 0).coerceIn(0, 1)
