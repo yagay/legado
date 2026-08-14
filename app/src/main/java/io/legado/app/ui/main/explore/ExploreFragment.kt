@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.IntRect
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.AppCompatSpinner
+import androidx.core.content.ContextCompat
 import androidx.core.widget.NestedScrollView
 import com.google.android.flexbox.FlexboxLayout
 import androidx.core.os.bundleOf
@@ -85,10 +86,8 @@ import io.legado.app.lib.theme.applyUiSectionTitleStyle
 import io.legado.app.lib.theme.applyUiTitleTypeface
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
-import io.legado.app.lib.theme.themeCardColorOrDefault
-import io.legado.app.lib.theme.themeMutedColorOrDefault
 import io.legado.app.lib.theme.uiTypeface
-import io.legado.app.lib.theme.UiCorner
+import io.legado.app.lib.theme.filletBackground
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.book.explore.ExploreShowActivity
 import io.legado.app.ui.book.explore.ExploreShowAdapter
@@ -2344,10 +2343,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val dialogContent = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = ViewGroup.LayoutParams(dialogWidth, dialogHeight)
-            background = UiCorner.opaqueRounded(
-                context.themeCardColorOrDefault(),
-                UiCorner.panelRadius(context)
-            )
+            background = context.filletBackground
             setPadding(8.dpToPx(), 8.dpToPx(), 8.dpToPx(), 10.dpToPx())
             addView(
                 refreshLayout,
@@ -2362,10 +2358,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             root.setPadding(0, 0, 0, 0)
             root.background = null
             llTitle.isClickable = false
-            llTitle.background = UiCorner.opaqueRounded(
-                context.themeMutedColorOrDefault(),
-                UiCorner.actionRadius(context)
-            )
+            llTitle.background = ContextCompat.getDrawable(context, R.drawable.bg_popup_menu)
             tvName.text = source.bookSourceName
             ivStatus.gone()
             flexbox.visible()
