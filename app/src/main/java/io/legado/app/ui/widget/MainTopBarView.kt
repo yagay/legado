@@ -78,7 +78,7 @@ class MainTopBarView @JvmOverloads constructor(
         textSize = 14f
         typeface = context.uiTypeface()
         setTextColor(context.secondaryTextColor)
-        setPadding(8.dp, 0, 8.dp, 0)
+        setPadding(0, 0, 0, 0)
         isVisible = false
     }
     private val primaryFilterRow = LinearLayout(context)
