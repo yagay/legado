@@ -198,7 +198,7 @@ fun DiscoverySuiteHomeScreen(
         }
         SearchBookPreviewOverlay(
             state = previewState,
-            renderConfig = baseRenderConfig,
+            renderConfig = renderConfig,
             fragment = fragment,
             lifecycle = lifecycle,
             onDismissed = { previewState = null },
