@@ -19,8 +19,9 @@ jobs:
           fetch-depth: 0
 
       - name: Patch ReviewDetailDialog
-        shell: python
+        shell: bash
         run: |
+          python3 <<'PY'
           from pathlib import Path
 
           path = Path('app/src/main/java/io/legado/app/ui/book/read/ReviewDetailDialog.kt')
@@ -132,6 +133,7 @@ jobs:
               text = text[:start] + new + text[end:]
 
           path.write_text(text, encoding='utf-8')
+          PY
 
       - name: Validate patch
         run: |
