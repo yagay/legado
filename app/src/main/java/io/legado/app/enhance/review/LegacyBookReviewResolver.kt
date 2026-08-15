@@ -29,11 +29,7 @@ internal object LegacyBookReviewResolver {
     private fun resolveFanqieAggregateComments(source: BookSource, book: Book): ReviewRule? {
         if (!isFanqieAggregateCommentProtocol(source)) return null
 
-        val bookId = Regex("[?&]book_id=(\\d+)")
-            .find(book.bookUrl)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?: return null
+        val bookId = fanqieAggregateBookId(book) ?: return null
         val sourceBase = source.bookSourceUrl
             .substringBefore('#')
             .trimEnd('/')
@@ -146,7 +142,14 @@ internal object LegacyBookReviewResolver {
         )
     }
 
-    private fun isFanqieAggregateCommentProtocol(source: BookSource): Boolean {
+    internal fun fanqieAggregateBookId(book: Book): String? {
+        return Regex("[?&]book_id=(\\d+)")
+            .find(book.bookUrl)
+            ?.groupValues
+            ?.getOrNull(1)
+    }
+
+    internal fun isFanqieAggregateCommentProtocol(source: BookSource): Boolean {
         val content = source.ruleContent?.content.orEmpty()
         val searchBookUrl = source.ruleSearch?.bookUrl.orEmpty()
         val exploreBookUrl = source.ruleExplore?.bookUrl.orEmpty()
@@ -206,7 +209,7 @@ internal object LegacyBookReviewResolver {
                 exploreBookUrl.contains("detailadr.reader.qq.com/"))
     }
 
-    private fun isJjwxcBookCommentProtocol(source: BookSource): Boolean {
+    internal fun isJjwxcBookCommentProtocol(source: BookSource): Boolean {
         val infoIntro = source.ruleBookInfo?.intro.orEmpty()
 
         return infoIntro.contains("comment/getCommentList?versionCode=268&novelId=") &&
