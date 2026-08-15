@@ -107,7 +107,7 @@ class BookReviewEntryView @JvmOverloads constructor(
                 ?: appDb.searchBookDao.getFirstByNameAuthor(name, author)?.toBook()
                 ?: return@launch
 
-            val source = if (book.isLocal) null else appDb.bookSourceDao.getBookSource(book.origin)
+            val source = appDb.bookSourceDao.getBookSource(book.origin)
             withContext(Main) {
                 bind(book, source)
             }
