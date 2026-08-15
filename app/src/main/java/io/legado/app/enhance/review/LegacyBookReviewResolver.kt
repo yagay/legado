@@ -46,6 +46,7 @@ internal object LegacyBookReviewResolver {
             "var u=c.user_info||c.user||{};var b=[];" +
             "if(c.score!==undefined&&c.score!==null&&String(c.score)!=='')b.push('⭐ '+c.score);" +
             "if(u.is_author||c.is_author)b.push('作者');" +
+            "if(u.is_vip||c.is_vip)b.push('VIP');" +
             "var tags=c.tags||u.tags||[];if(Array.isArray(tags)){for(var i=0;i<tags.length;i++){" +
             "var t=tags[i];if(t&&typeof t==='object')t=t.name||t.text||t.title;if(t)b.push(String(t));}}" +
             "JSON.stringify(b)"
@@ -74,6 +75,12 @@ internal object LegacyBookReviewResolver {
             detailNameRule = nameRule,
             detailBadgeRule = badgeRule,
             detailContentRule = contentRule,
+            replyListRule = "$.replies",
+            replyIdRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);String(c.comment_id||c.id||'')",
+            replyAvatarRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);var u=c.user||c.user_info||{};String(u.user_avatar||u.avatar_url||u.avatar||u.user_avatar_url||'')",
+            replyNameRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);var u=c.user||c.user_info||{};var n=String(u.user_name||u.nickname||u.name||'匿名');var r=c.reply_to_user||{};var rn=String(r.user_name||r.nickname||r.name||'');rn?n+' 回复 '+rn:n",
+            replyBadgeRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);var u=c.user||c.user_info||{};var b=[];if(u.is_author||c.is_author)b.push('作者');if(u.is_vip||c.is_vip)b.push('VIP');var tags=u.tags||c.tags||[];if(Array.isArray(tags)){for(var i=0;i<tags.length;i++){var t=tags[i];if(t&&typeof t==='object')t=t.name||t.text||t.title;if(t)b.push(String(t));}}JSON.stringify(b)",
+            replyContentRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);var t=String(c.content||c.text||'');var tm=c.create_time||c.create_time_str||c.publish_time||c.comment_time||c.created_at||c.createdAt||'';if(!tm&&c.create_timestamp){var n=Number(c.create_timestamp);if(n<1000000000000)n*=1000;try{tm=new Date(n).toLocaleString();}catch(x){tm=String(c.create_timestamp);}}var img=String(c.image_url||c.image||'');JSON.stringify({text:t,img:img,time:String(tm||''),likeCount:Number(c.like_count||c.digg_count||0)})",
         )
     }
 

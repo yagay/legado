@@ -828,19 +828,29 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                 width = avatarSize
                 height = avatarSize
             }
+            val secondaryColor = context.getCompatColor(R.color.secondaryText)
 
             if (item.avatar.isNullOrBlank()) {
-                binding.ivAvatar.gone()
+                // Match the source web review UI: keep an avatar placeholder instead of
+                // collapsing the avatar column when a user has no public avatar.
+                binding.ivAvatar.visible()
+                Glide.with(binding.ivAvatar).clear(binding.ivAvatar)
+                binding.ivAvatar.setImageResource(R.drawable.ic_author)
+                binding.ivAvatar.setColorFilter(secondaryColor)
+                binding.ivAvatar.setPadding(4.dpToPx(), 4.dpToPx(), 4.dpToPx(), 4.dpToPx())
             } else {
                 binding.ivAvatar.visible()
+                binding.ivAvatar.clearColorFilter()
+                binding.ivAvatar.setPadding(0, 0, 0, 0)
                 ImageLoader.load(context, item.avatar)
                     .apply(sourceImageOptions)
                     .circleCrop()
+                    .placeholder(R.drawable.ic_author)
+                    .error(R.drawable.ic_author)
                     .into(binding.ivAvatar)
             }
 
             val primaryColor = context.getCompatColor(R.color.primaryText)
-            val secondaryColor = context.getCompatColor(R.color.secondaryText)
             val contentColor = context.getCompatColor(R.color.reviewContentText)
             binding.llBadges.visibility = if (item.badges.isEmpty()) View.GONE else View.VISIBLE
             bindBadges(binding.llBadges, item.badges)
