@@ -28,11 +28,9 @@ import kotlinx.coroutines.withContext
 /**
  * Book detail entry for book-level reviews.
  *
- * The normal path uses source.ruleReview. LegacyBookReviewResolver is a conservative compatibility
- * bridge for old sources that already expose whole-book reviews through toc/content rules.
- *
- * The dialog receives an explicit ReviewContext, so opening book reviews does not mutate ReadBook
- * or the persisted/in-memory BookSource rule. Parsing, paging, image and audio UI stay shared.
+ * Capability resolution is centralized in ReviewCapabilityResolver. BookInfoActivity can bind the
+ * current book/source directly after refresh or source changes; the attach-time DB lookup remains
+ * only as a compatibility fallback for callers that have not bound explicitly yet.
  */
 class BookReviewEntryView @JvmOverloads constructor(
     context: Context,
@@ -42,6 +40,7 @@ class BookReviewEntryView @JvmOverloads constructor(
     private var boundBook: Book? = null
     private var boundSource: BookSource? = null
     private var boundRule: ReviewRule? = null
+    private var explicitlyBound = false
 
     init {
         orientation = HORIZONTAL
@@ -83,7 +82,25 @@ class BookReviewEntryView @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        resolveBookAndSource()
+        if (!explicitlyBound) resolveBookAndSource()
+    }
+
+    fun bind(book: Book, source: BookSource?) {
+        explicitlyBound = true
+        val effectiveRule = ReviewCapabilityResolver.resolveBookReview(source, book)
+
+        if (source == null || effectiveRule == null) {
+            boundBook = null
+            boundSource = null
+            boundRule = null
+            visibility = View.GONE
+            return
+        }
+
+        boundBook = book
+        boundSource = source
+        boundRule = effectiveRule
+        visibility = View.VISIBLE
     }
 
     private fun resolveBookAndSource() {
@@ -103,35 +120,9 @@ class BookReviewEntryView @JvmOverloads constructor(
 
             val source = appDb.bookSourceDao.getBookSource(book.origin)
             withContext(Main) {
-                bind(book, source)
+                if (!explicitlyBound) bind(book, source)
             }
         }
-    }
-
-    private fun bind(book: Book, source: BookSource?) {
-        val nativeRule = source?.ruleReview?.takeIf(::isBookReviewRule)
-        val effectiveRule = nativeRule ?: source?.let { LegacyBookReviewResolver.resolve(it, book) }
-
-        if (source == null || effectiveRule == null) {
-            boundBook = null
-            boundSource = null
-            boundRule = null
-            visibility = View.GONE
-            return
-        }
-
-        boundBook = book
-        boundSource = source
-        boundRule = effectiveRule
-        visibility = View.VISIBLE
-    }
-
-    private fun isBookReviewRule(rule: ReviewRule): Boolean {
-        return rule.enabled &&
-            !rule.reviewDetailUrl.isNullOrBlank() &&
-            !rule.detailListRule.isNullOrBlank() &&
-            !rule.detailContentRule.isNullOrBlank() &&
-            rule.summaryParagraphIndexRule.isNullOrBlank()
     }
 
     private fun openBookReview() {
