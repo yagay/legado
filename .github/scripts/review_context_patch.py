@@ -25,7 +25,7 @@ if 'constructor(reviewContext: ReviewContext' not in text:
     ) : this() {
         val sessionId = ReviewDialogSessionStore.put(reviewContext, rule)
         arguments = Bundle().apply {
-            putString(ARG_REVIEW_SESSION_ID, sessionId)
+            putString("reviewSessionId", sessionId)
             putInt(ARG_TOTAL_COUNT, totalCount)
             putString(ARG_SOURCE_KEY, reviewContext.source.getKey())
             putInt(ARG_RULE_HASH, (rule ?: reviewContext.source.ruleReview)?.hashCode() ?: 0)
@@ -40,10 +40,9 @@ if 'private var reviewSessionId: String = ""' not in text:
     text = text.replace(field_anchor, field_anchor + '    private var reviewSessionId: String = ""\n', 1)
 
 init_anchor = '        ruleHash = arguments?.getInt(ARG_RULE_HASH) ?: 0\n'
-if 'ARG_REVIEW_SESSION_ID' not in text[text.find('override fun onFragmentCreated'):text.find('private fun setupHeightDrag')]:
-    text = text.replace(init_anchor, init_anchor + '        reviewSessionId = arguments?.getString(ARG_REVIEW_SESSION_ID).orEmpty()\n', 1)
+if 'getString("reviewSessionId")' not in text:
+    text = text.replace(init_anchor, init_anchor + '        reviewSessionId = arguments?.getString("reviewSessionId").orEmpty()\n', 1)
 
-# Replace async request preparation inside loadDetailPage only.
 start_marker = '    private fun loadDetailPage(paragraphNum: Int, page: Int, append: Boolean) {'
 end_marker = '    private fun loadReplies(parentKey: String) {'
 start = text.find(start_marker)
@@ -119,7 +118,6 @@ if old not in block:
 block = block.replace(old, new, 1)
 text = text[:start] + block + text[end:]
 
-# Clean session on destroy.
 destroy_old = '''    override fun onDestroyView() {
         releaseAudioPlayer()
         super.onDestroyView()
@@ -133,14 +131,6 @@ destroy_new = '''    override fun onDestroyView() {
 '''
 if destroy_old in text:
     text = text.replace(destroy_old, destroy_new, 1)
-
-# Add companion argument constant.
-companion = text.rfind('    companion object {')
-if companion < 0:
-    raise SystemExit('companion object not found')
-insert_pos = text.find('\n', companion) + 1
-if 'ARG_REVIEW_SESSION_ID' not in text[companion:]:
-    text = text[:insert_pos] + '        private const val ARG_REVIEW_SESSION_ID = "reviewSessionId"\n' + text[insert_pos:]
 
 path.write_text(text, encoding='utf-8')
 
