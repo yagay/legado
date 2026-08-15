@@ -38,6 +38,7 @@ import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
+import io.legado.app.enhance.review.ReviewLoader
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.help.glide.ImageLoader
@@ -443,77 +444,20 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             if (source.getKey() != sourceKey) return@async null
             val book = ReadBook.book ?: return@async null
             if (book.bookUrl != bookUrl) return@async null
-            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex) ?: return@async null
-            if (source.isJsSource()) {
-                if (source.mainJs.hashCode() != ruleHash) return@async null
-                val result = JsSourceReview.getReviewDetailAwait(
+            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
+                ?: return@async null
+            ReviewLoader.loadDetail(
+                ReviewLoader.DetailRequest(
                     source = source,
                     book = book,
                     chapter = chapter,
                     paragraphIndex = paragraphNum,
                     paragraphData = paragraphData,
                     page = page,
-                ) ?: return@async null
-                return@async ReviewResult(
-                    items = result.items,
-                    nextPageUrl = result.nextPageUrl,
-                    hasNextPageRule = true,
-                    hasReplyUrl = JsSourceReview.hasReviewRepliesCapability(source),
-                    source = source,
-                )
-            }
-            val rule = source.ruleReview ?: return@async null
-            if (!rule.enabled || rule.hashCode() != ruleHash) return@async null
-            val firstPageUrlRule = rule.reviewDetailUrl?.takeIf { it.isNotBlank() } ?: return@async null
-            val nextPageUrlRule = rule.reviewDetailNextPageUrl?.takeIf { it.isNotBlank() }
-            val effectiveNextUrl = nextPageUrl?.takeIf { it.isNotBlank() }
-            if (page > 1 && effectiveNextUrl == null && nextPageUrlRule == null) return@async null
-            val detailUrlRule = when {
-                page > 1 && !effectiveNextUrl.isNullOrBlank() -> effectiveNextUrl
-                page > 1 -> nextPageUrlRule ?: firstPageUrlRule
-                else -> firstPageUrlRule
-            }
-            if (rule.detailListRule.isNullOrBlank() || rule.detailContentRule.isNullOrBlank()) {
-                return@async null
-            }
-            val paraIndex = paragraphNum.toString()
-            val paraData = paragraphData
-            val analyzeUrl = AnalyzeUrl(
-                detailUrlRule,
-                page = page,
-                extraParams = mapOf(
-                    "paraIndex" to paraIndex,
-                    "paraData" to paraData,
-                    "page" to page.toString()
+                    ruleHash = ruleHash,
+                    nextPageUrl = nextPageUrl,
                 ),
-                baseUrl = chapter.url,
-                source = source,
-                ruleData = book,
-                chapter = chapter,
-                coroutineContext = coroutineContext
-            )
-            val body = analyzeUrl.getStrResponseAwait(useWebView = false).body ?: ""
-            val result = ReviewRuleParser.parseDetailPage(
-                body = body,
-                rule = rule,
-                nextPageRule = nextPageUrlRule,
-                baseUrl = analyzeUrl.url,
-                source = source,
-                book = book,
-                chapter = chapter,
-                context = coroutineContext,
-                paraIndex = paraIndex,
-                paraData = paraData,
-                page = page.toString()
-            )
-            ReviewResult(
-                items = result.items,
-                nextPageUrl = result.nextPageUrl,
-                hasNextPageRule = nextPageUrlRule != null,
-                hasReplyUrl = !rule.reviewQuoteUrl.isNullOrBlank() &&
-                        !rule.replyListRule.isNullOrBlank() &&
-                        !rule.replyContentRule.isNullOrBlank(),
-                source = source,
+                coroutineContext = coroutineContext,
             )
         }.onSuccess(Main) { result ->
             if (!append) {
