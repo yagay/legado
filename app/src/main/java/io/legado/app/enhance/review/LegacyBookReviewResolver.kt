@@ -18,6 +18,7 @@ internal object LegacyBookReviewResolver {
         return resolveYousuu(source, book)
             ?: resolveDoubanShortComments(source, book)
             ?: resolveQqDetailCommentList(source, book)
+            ?: resolveJjwxcBookComments(source, book)
     }
 
     private fun resolveYousuu(source: BookSource, book: Book): ReviewRule? {
@@ -39,15 +40,6 @@ internal object LegacyBookReviewResolver {
         )
     }
 
-    /**
-     * Legacy Douban sources model long reviews as fake chapters: /reviews -> review detail URL.
-     * ReviewDetailDialog currently has no per-item second request, therefore mapping that path
-     * would show incomplete items. The native bridge deliberately uses the book-level short
-     * comment list (/comments/) first; each row already contains the displayable comment body and
-     * can be parsed by the existing ReviewRuleParser in one request.
-     *
-     * Long-review drill-down can be added later after the review loader is separated from the UI.
-     */
     private fun resolveDoubanShortComments(source: BookSource, book: Book): ReviewRule? {
         if (!isLegacyDoubanReviewProtocol(source)) return null
 
@@ -68,15 +60,6 @@ internal object LegacyBookReviewResolver {
         )
     }
 
-    /**
-     * Some QQ Reader legacy sources already receive a small whole-book commentlist in the normal
-     * book-detail JSON and append only commentlist.content to the introduction. Re-requesting the
-     * same book-detail URL lets the native review UI show those items without introducing another
-     * endpoint or changing the source JSON.
-     *
-     * This is intentionally a preview adapter: the legacy source does not expose a paged full
-     * review endpoint, so no next-page rule is fabricated here.
-     */
     private fun resolveQqDetailCommentList(source: BookSource, book: Book): ReviewRule? {
         if (!isQqDetailCommentListProtocol(source)) return null
 
@@ -90,6 +73,30 @@ internal object LegacyBookReviewResolver {
             reviewDetailUrl = detailUrl,
             detailListRule = "$..commentlist[*]",
             detailContentRule = "$.content",
+        )
+    }
+
+    /**
+     * Older JJWXC sources already request a whole-book preview list with only novelId and parse
+     * data.commentList. Keep that scope separate from chapter comments such as comment_json.php,
+     * which also require chapterId and therefore belong to chapter review rather than BookReview.
+     */
+    private fun resolveJjwxcBookComments(source: BookSource, book: Book): ReviewRule? {
+        if (!isJjwxcBookCommentProtocol(source)) return null
+
+        val novelId = Regex("(?:novelId=|/book\\d?/)(\\d+)")
+            .find(book.bookUrl)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?: return null
+
+        return ReviewRule(
+            enabled = true,
+            reviewDetailUrl = "https://android.jjwxc.net/comment/getCommentList?versionCode=268&novelId=$novelId&limit=5",
+            detailListRule = "$.data.commentList",
+            detailNameRule = "$.commentAuthor",
+            detailBadgeRule = "$.ip_pos",
+            detailContentRule = "$.commentBody",
         )
     }
 
@@ -134,5 +141,16 @@ internal object LegacyBookReviewResolver {
             tocUrl.contains("ubook.reader.qq.com/api/book/chapter-list") &&
             (searchBookUrl.contains("detailadr.reader.qq.com/") ||
                 exploreBookUrl.contains("detailadr.reader.qq.com/"))
+    }
+
+    private fun isJjwxcBookCommentProtocol(source: BookSource): Boolean {
+        val infoIntro = source.ruleBookInfo?.intro.orEmpty()
+
+        return infoIntro.contains("comment/getCommentList?versionCode=268&novelId=") &&
+            infoIntro.contains("A.data.commentList") &&
+            infoIntro.contains("commentAuthor") &&
+            infoIntro.contains("commentBody") &&
+            infoIntro.contains("commentDate") &&
+            !infoIntro.contains("chapterId=")
     }
 }
