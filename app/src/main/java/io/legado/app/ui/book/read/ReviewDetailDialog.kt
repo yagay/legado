@@ -106,7 +106,14 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
             putString("reviewSessionId", sessionId)
             putInt(ARG_TOTAL_COUNT, totalCount)
             putString(ARG_SOURCE_KEY, reviewContext.source.getKey())
-            putInt(ARG_RULE_HASH, (rule ?: reviewContext.source.ruleReview)?.hashCode() ?: 0)
+            putInt(
+                ARG_RULE_HASH,
+                when {
+                    rule != null -> rule.hashCode()
+                    reviewContext.source.isJsSource() -> reviewContext.source.mainJs.hashCode()
+                    else -> reviewContext.source.ruleReview?.hashCode() ?: 0
+                }
+            )
         }
     }
 

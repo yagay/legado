@@ -42,6 +42,7 @@ import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.rule.ReviewRule
+import io.legado.app.enhance.review.ReviewContext
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.HighlightColors
@@ -1773,19 +1774,40 @@ class ReadBookActivity : BaseReadBookActivity(),
             return
         }
         val source = ReadBook.bookSource ?: return
+        val book = ReadBook.book ?: return
+        val reviewData = ChapterProvider.getReviewKeyById(paragraphNum, chapterIndex).orEmpty()
+
         if (source.isJsSource()) {
-            val book = ReadBook.book ?: return
-            showDialogFragment(
-                ReviewDetailDialog(
-                    paragraphNum = paragraphNum,
-                    totalCount = count,
-                    chapterIndex = chapterIndex,
-                    paragraphData = ChapterProvider.getReviewKeyById(paragraphNum, chapterIndex),
-                    bookUrl = book.bookUrl,
-                    sourceKey = source.getKey(),
-                    ruleHash = source.mainJs.hashCode(),
+            if (paragraphNum == -1) {
+                lifecycleScope.launch {
+                    val chapter = withContext(IO) {
+                        appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
+                    } ?: return@launch
+                    showDialogFragment(
+                        ReviewDetailDialog(
+                            reviewContext = ReviewContext.ChapterReview(
+                                source = source,
+                                book = book,
+                                chapter = chapter,
+                                reviewData = reviewData,
+                            ),
+                            totalCount = count,
+                        )
+                    )
+                }
+            } else {
+                showDialogFragment(
+                    ReviewDetailDialog(
+                        paragraphNum = paragraphNum,
+                        totalCount = count,
+                        chapterIndex = chapterIndex,
+                        paragraphData = reviewData,
+                        bookUrl = book.bookUrl,
+                        sourceKey = source.getKey(),
+                        ruleHash = source.mainJs.hashCode(),
+                    )
                 )
-            )
+            }
             return
         }
         val rule = source.ruleReview ?: run {
@@ -1804,13 +1826,34 @@ class ReadBookActivity : BaseReadBookActivity(),
             toastOnUi(R.string.review_detail_rule_missing)
             return
         }
-        val book = ReadBook.book ?: return
+
+        if (paragraphNum == -1) {
+            lifecycleScope.launch {
+                val chapter = withContext(IO) {
+                    appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
+                } ?: return@launch
+                showDialogFragment(
+                    ReviewDetailDialog(
+                        reviewContext = ReviewContext.ChapterReview(
+                            source = source,
+                            book = book,
+                            chapter = chapter,
+                            reviewData = reviewData,
+                        ),
+                        rule = rule,
+                        totalCount = count,
+                    )
+                )
+            }
+            return
+        }
+
         showDialogFragment(
             ReviewDetailDialog(
                 paragraphNum = paragraphNum,
                 totalCount = count,
                 chapterIndex = chapterIndex,
-                paragraphData = ChapterProvider.getReviewKeyById(paragraphNum, chapterIndex),
+                paragraphData = reviewData,
                 bookUrl = book.bookUrl,
                 sourceKey = source.getKey(),
                 ruleHash = rule.hashCode()
