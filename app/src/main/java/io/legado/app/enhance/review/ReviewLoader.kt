@@ -98,18 +98,16 @@ internal object ReviewLoader {
             coroutineContext = coroutineContext,
         )
         val body = analyzeUrl.getStrResponseAwait(useWebView = false).body ?: return null
-        return SummaryResult(
-            summary = ReviewRuleParser.parseSummary(
-                body,
-                rule,
-                source,
-                book,
-                chapter,
-                analyzeUrl.url,
-                coroutineContext,
-            ),
-            source = source,
-        )
+        val summary = ReviewRuleParser.parseSummary(
+            body,
+            rule,
+            source,
+            book,
+            chapter,
+            analyzeUrl.url,
+            coroutineContext,
+        ) ?: return null
+        return SummaryResult(summary = summary, source = source)
     }
 
     suspend fun loadDetail(
@@ -296,6 +294,6 @@ internal object ReviewLoader {
             source = source,
         )
     }
-    private const val LEGACY_DOUBAN_NEXT_PREFIX = "legacy-douban:"
 
+    private const val LEGACY_DOUBAN_NEXT_PREFIX = "legacy-douban:"
 }
