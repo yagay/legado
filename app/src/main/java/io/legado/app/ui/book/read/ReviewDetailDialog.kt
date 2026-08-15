@@ -36,7 +36,6 @@ import io.legado.app.base.BaseDialogFragment
 import io.legado.app.constant.AppLog
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
-import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.enhance.review.ReviewLoader
 import io.legado.app.enhance.review.ReviewContext
@@ -48,7 +47,6 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.glide.OkHttpModelLoader
-import io.legado.app.model.ReadBook
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.getMediaItem
 import io.legado.app.model.analyzeRule.ReviewRuleParser
@@ -77,26 +75,6 @@ import kotlin.math.roundToInt
 class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
 
     constructor(
-        paragraphNum: Int,
-        totalCount: Int,
-        chapterIndex: Int,
-        paragraphData: String?,
-        bookUrl: String,
-        sourceKey: String,
-        ruleHash: Int,
-    ) : this() {
-        arguments = Bundle().apply {
-            putInt(ARG_PARAGRAPH_NUM, paragraphNum)
-            putInt(ARG_TOTAL_COUNT, totalCount)
-            putInt(ARG_CHAPTER_INDEX, chapterIndex)
-            putString(ARG_PARAGRAPH_DATA, paragraphData)
-            putString(ARG_BOOK_URL, bookUrl)
-            putString(ARG_SOURCE_KEY, sourceKey)
-            putInt(ARG_RULE_HASH, ruleHash)
-        }
-    }
-
-    constructor(
         reviewContext: ReviewContext,
         rule: io.legado.app.data.entities.rule.ReviewRule? = null,
         totalCount: Int = 0,
@@ -119,11 +97,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
 
     private val binding by viewBinding(DialogRecyclerViewBinding::bind)
     private val adapter by lazy { ReviewAdapter(requireContext()) }
-    private var paragraphNum: Int = 0
     private var totalCount: Int = 0
-    private var chapterIndex: Int = 0
-    private var paragraphData: String = ""
-    private var bookUrl: String = ""
     private var sourceKey: String = ""
     private var ruleHash: Int = 0
     private var reviewSessionId: String = ""
@@ -229,11 +203,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        paragraphNum = arguments?.getInt(ARG_PARAGRAPH_NUM) ?: 0
         totalCount = arguments?.getInt(ARG_TOTAL_COUNT) ?: 0
-        chapterIndex = arguments?.getInt(ARG_CHAPTER_INDEX) ?: 0
-        paragraphData = arguments?.getString(ARG_PARAGRAPH_DATA).orEmpty()
-        bookUrl = arguments?.getString(ARG_BOOK_URL).orEmpty()
         sourceKey = arguments?.getString(ARG_SOURCE_KEY).orEmpty()
         ruleHash = arguments?.getInt(ARG_RULE_HASH) ?: 0
         reviewSessionId = arguments?.getString("reviewSessionId").orEmpty()
@@ -292,11 +262,11 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                 if (dy <= 0) return
                 val lastVisible = layoutManager.findLastVisibleItemPosition()
                 if (hasMore && !isLoading && lastVisible >= adapter.itemCount - 3) {
-                    loadDetailPage(paragraphNum, currentPage + 1, append = true)
+                    loadDetailPage(currentPage + 1, append = true)
                 }
             }
         })
-        loadDetailPage(paragraphNum, 1, append = false)
+        loadDetailPage(1, append = false)
     }
 
     private fun setupHeightDrag() {
@@ -448,7 +418,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         }
     }
 
-    private fun loadDetailPage(paragraphNum: Int, page: Int, append: Boolean) {
+    private fun loadDetailPage(page: Int, append: Boolean) {
         if (isLoading) return
         if (!append) {
             binding.rotateLoading.visible()
@@ -468,43 +438,21 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         if (!hasMore) return
         isLoading = true
         Coroutine.async(lifecycleScope, IO, start = CoroutineStart.LAZY) {
-            val session = ReviewDialogSessionStore.get(reviewSessionId)
-            if (session != null) {
-                val reviewContext = session.context
-                val source = reviewContext.source
-                val rule = session.rule ?: source.ruleReview
-                return@async ReviewLoader.loadDetail(
-                    ReviewLoader.DetailRequest(
-                        source = source,
-                        book = reviewContext.book,
-                        chapter = reviewContext.chapterForAnalyze(),
-                        paragraphIndex = reviewContext.paragraphIndexForAnalyze(),
-                        paragraphData = reviewContext.paragraphDataForAnalyze(),
-                        page = page,
-                        ruleHash = rule?.hashCode() ?: ruleHash,
-                        nextPageUrl = nextPageUrl,
-                        ruleOverride = session.rule,
-                    ),
-                    coroutineContext = coroutineContext,
-                )
-            }
-
-            val source = ReadBook.bookSource ?: return@async null
-            if (source.getKey() != sourceKey) return@async null
-            val book = ReadBook.book ?: return@async null
-            if (book.bookUrl != bookUrl) return@async null
-            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
-                ?: return@async null
+            val session = ReviewDialogSessionStore.get(reviewSessionId) ?: return@async null
+            val reviewContext = session.context
+            val source = reviewContext.source
+            val rule = session.rule ?: source.ruleReview
             ReviewLoader.loadDetail(
                 ReviewLoader.DetailRequest(
                     source = source,
-                    book = book,
-                    chapter = chapter,
-                    paragraphIndex = paragraphNum,
-                    paragraphData = paragraphData,
+                    book = reviewContext.book,
+                    chapter = reviewContext.chapterForAnalyze(),
+                    paragraphIndex = reviewContext.paragraphIndexForAnalyze(),
+                    paragraphData = reviewContext.paragraphDataForAnalyze(),
                     page = page,
-                    ruleHash = ruleHash,
+                    ruleHash = rule?.hashCode() ?: ruleHash,
                     nextPageUrl = nextPageUrl,
+                    ruleOverride = session.rule,
                 ),
                 coroutineContext = coroutineContext,
             )
@@ -565,43 +513,21 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         val page = (replyPageByParentKey[parentKey] ?: 0) + 1
         renderUiItems()
         Coroutine.async(lifecycleScope, IO, start = CoroutineStart.LAZY) {
-            val session = ReviewDialogSessionStore.get(reviewSessionId)
-            if (session != null) {
-                val reviewContext = session.context
-                val source = reviewContext.source
-                val rule = session.rule ?: source.ruleReview
-                return@async ReviewLoader.loadReplies(
-                    ReviewLoader.ReplyRequest(
-                        source = source,
-                        book = reviewContext.book,
-                        chapter = reviewContext.chapterForAnalyze(),
-                        paragraphIndex = reviewContext.paragraphIndexForAnalyze(),
-                        paragraphData = reviewContext.paragraphDataForAnalyze(),
-                        reviewId = reviewId,
-                        page = page,
-                        ruleHash = rule?.hashCode() ?: ruleHash,
-                        ruleOverride = session.rule,
-                    ),
-                    coroutineContext = coroutineContext,
-                )
-            }
-
-            val source = ReadBook.bookSource ?: return@async null
-            if (source.getKey() != sourceKey) return@async null
-            val book = ReadBook.book ?: return@async null
-            if (book.bookUrl != bookUrl) return@async null
-            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
-                ?: return@async null
+            val session = ReviewDialogSessionStore.get(reviewSessionId) ?: return@async null
+            val reviewContext = session.context
+            val source = reviewContext.source
+            val rule = session.rule ?: source.ruleReview
             ReviewLoader.loadReplies(
                 ReviewLoader.ReplyRequest(
                     source = source,
-                    book = book,
-                    chapter = chapter,
-                    paragraphIndex = paragraphNum,
-                    paragraphData = paragraphData,
+                    book = reviewContext.book,
+                    chapter = reviewContext.chapterForAnalyze(),
+                    paragraphIndex = reviewContext.paragraphIndexForAnalyze(),
+                    paragraphData = reviewContext.paragraphDataForAnalyze(),
                     reviewId = reviewId,
                     page = page,
-                    ruleHash = ruleHash,
+                    ruleHash = rule?.hashCode() ?: ruleHash,
+                    ruleOverride = session.rule,
                 ),
                 coroutineContext = coroutineContext,
             )
