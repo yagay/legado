@@ -11,7 +11,7 @@ import io.legado.app.model.jsSource.JsSourceReview
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Shared network/parser layer for review detail pages.
+ * Shared network/parser layer for review detail pages and replies.
  *
  * The UI decides which book/chapter/paragraph context to use; this loader only executes the
  * source review protocol. Keeping that responsibility out of ReviewDetailDialog lets book,
@@ -36,6 +36,24 @@ internal object ReviewLoader {
         val nextPageUrl: String?,
         val hasNextPageRule: Boolean,
         val hasReplyUrl: Boolean,
+        val source: BaseSource,
+    )
+
+    data class ReplyRequest(
+        val source: BookSource,
+        val book: Book,
+        val chapter: BookChapter,
+        val paragraphIndex: Int,
+        val paragraphData: String,
+        val reviewId: String,
+        val page: Int,
+        val ruleHash: Int,
+        val ruleOverride: ReviewRule? = null,
+    )
+
+    data class ReplyResult(
+        val replies: List<ReviewRuleParser.DetailItem>,
+        val page: Int,
         val source: BaseSource,
     )
 
@@ -121,6 +139,76 @@ internal object ReviewLoader {
             hasReplyUrl = !rule.reviewQuoteUrl.isNullOrBlank() &&
                 !rule.replyListRule.isNullOrBlank() &&
                 !rule.replyContentRule.isNullOrBlank(),
+            source = source,
+        )
+    }
+
+    suspend fun loadReplies(
+        request: ReplyRequest,
+        coroutineContext: CoroutineContext,
+    ): ReplyResult? {
+        val source = request.source
+        val book = request.book
+        val chapter = request.chapter
+
+        if (source.isJsSource() && request.ruleOverride == null) {
+            if (source.mainJs.hashCode() != request.ruleHash) return null
+            val replies = JsSourceReview.getReviewRepliesAwait(
+                source = source,
+                book = book,
+                chapter = chapter,
+                paragraphIndex = request.paragraphIndex,
+                paragraphData = request.paragraphData,
+                reviewId = request.reviewId,
+                page = request.page,
+            ) ?: return null
+            return ReplyResult(
+                replies = replies,
+                page = request.page,
+                source = source,
+            )
+        }
+
+        val rule = request.ruleOverride ?: source.ruleReview ?: return null
+        if (!rule.enabled || rule.hashCode() != request.ruleHash) return null
+        val replyUrlRule = rule.reviewQuoteUrl?.takeIf { it.isNotBlank() } ?: return null
+        if (rule.replyListRule.isNullOrBlank() || rule.replyContentRule.isNullOrBlank()) {
+            return null
+        }
+
+        val paraIndex = request.paragraphIndex.toString()
+        val analyzeUrl = AnalyzeUrl(
+            replyUrlRule,
+            page = request.page,
+            extraParams = mapOf(
+                "paraIndex" to paraIndex,
+                "paraData" to request.paragraphData,
+                "reviewId" to request.reviewId,
+                "page" to request.page.toString(),
+            ),
+            baseUrl = chapter.url,
+            source = source,
+            ruleData = book,
+            chapter = chapter,
+            coroutineContext = coroutineContext,
+        )
+        val body = analyzeUrl.getStrResponseAwait(useWebView = false).body
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+        return ReplyResult(
+            replies = ReviewRuleParser.parseReplyPage(
+                body = body,
+                rule = rule,
+                baseUrl = analyzeUrl.url,
+                source = source,
+                book = book,
+                chapter = chapter,
+                context = coroutineContext,
+                paraIndex = paraIndex,
+                paraData = request.paragraphData,
+                page = request.page.toString(),
+            ),
+            page = request.page,
             source = source,
         )
     }
