@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: leg-branch-build
@@ -18,6 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Apply review summary patch
+        run: |
+          python .github/scripts/review_summary_patch.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt
+          git diff --cached --quiet || git commit -m "route review summary loading through ReviewLoader"
+          git push
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
