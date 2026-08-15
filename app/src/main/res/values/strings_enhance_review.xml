@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="book_review">书评</string>
+    <string name="view_book_review">查看书评</string>
+</resources>
