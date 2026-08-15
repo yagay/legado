@@ -8,31 +8,74 @@ import io.legado.app.data.entities.rule.ReviewRule
  * Conservative bridge for legacy sources that already expose whole-book reviews through
  * ruleBookInfo/ruleToc/ruleContent instead of ruleReview.
  *
- * Keep adapters protocol-specific and high-confidence. Do not infer review capability from
- * generic words such as "review", "comment" or "书评", because those commonly occur in CSS,
- * ranking URLs and directory exclusion rules.
+ * Adapters are detected from protocol structure rather than source display names. Generic words
+ * such as "review", "comment" or "书评" are intentionally insufficient because they frequently
+ * occur in CSS, rankings and replacement rules that have nothing to do with review capability.
  */
 internal object LegacyBookReviewResolver {
 
     fun resolve(source: BookSource, book: Book): ReviewRule? {
-        return resolveYousuu(source, book)
+        return resolveFanqieAggregateComments(source, book)
+            ?: resolveYousuu(source, book)
             ?: resolveDoubanShortComments(source, book)
             ?: resolveQqDetailCommentList(source, book)
             ?: resolveJjwxcBookComments(source, book)
     }
 
-    private fun resolveYousuu(source: BookSource, book: Book): ReviewRule? {
-        if (!isYousuuCommentProtocol(source)) return null
+    /**
+     * Third-party Fanqie aggregate APIs that historically append whole-book comments from
+     * /api/comment into every chapter body. Move that protocol into the shared review UI instead.
+     */
+    private fun resolveFanqieAggregateComments(source: BookSource, book: Book): ReviewRule? {
+        if (!isFanqieAggregateCommentProtocol(source)) return null
 
-        val bookApiUrl = book.bookUrl
+        val bookId = Regex("[?&]book_id=(\\d+)")
+            .find(book.bookUrl)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?: return null
+        val sourceBase = source.bookSourceUrl
             .substringBefore('#')
-            .substringBefore('?')
             .trimEnd('/')
-        if (!bookApiUrl.contains("/api/book/")) return null
+            .takeIf { it.startsWith("http://") || it.startsWith("https://") }
+            ?: return null
+        val firstUrl = "$sourceBase/api/comment?book_id=$bookId&count=50&offset=0"
+        val nextUrlRule = "@js:var d=JSON.parse(result);" +
+            "var x=d&&d.data&&d.data.data;" +
+            "x&&x.has_more?'$sourceBase/api/comment?book_id=$bookId&count=50&offset='+" +
+            "(parseInt(page)*50):''"
+        val contentRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);" +
+            "JSON.stringify({text:String(c.text||''),likeCount:Number(c.digg_count||0)," +
+            "replyCount:Number(c.reply_count||0)})"
 
         return ReviewRule(
             enabled = true,
-            reviewDetailUrl = "$bookApiUrl/comment?type=latest&page=1",
+            reviewDetailUrl = firstUrl,
+            reviewDetailNextPageUrl = nextUrlRule,
+            detailListRule = "$.data.data.comment",
+            detailNameRule = "$.user_info.user_name",
+            detailBadgeRule = "$.score",
+            detailContentRule = contentRule,
+        )
+    }
+
+    private fun resolveYousuu(source: BookSource, book: Book): ReviewRule? {
+        if (!isYousuuCommentProtocol(source)) return null
+
+        val bookUrl = book.bookUrl
+            .substringBefore('#')
+            .substringBefore('?')
+            .trimEnd('/')
+        if (!bookUrl.contains("/book/")) return null
+        val detailUrl = if (bookUrl.contains("/api/book/")) {
+            "$bookUrl/comment?type=latest&page=1"
+        } else {
+            "$bookUrl/comment"
+        }
+
+        return ReviewRule(
+            enabled = true,
+            reviewDetailUrl = detailUrl,
             detailListRule = "$.data.comments",
             detailNameRule = "$.createrId.userName",
             detailBadgeRule = "$.score",
@@ -49,6 +92,9 @@ internal object LegacyBookReviewResolver {
             .trimEnd('/')
         if (!bookUrl.contains("douban.com/subject/")) return null
 
+        // Long reviews are attempted first by LegacyBookReviewLoader. This rule is also the
+        // compatible short-comment fallback used by sources that switch to /comments/ when no
+        // long reviews exist.
         return ReviewRule(
             enabled = true,
             reviewDetailUrl = "$bookUrl/comments/",
@@ -100,35 +146,52 @@ internal object LegacyBookReviewResolver {
         )
     }
 
-    private fun isYousuuCommentProtocol(source: BookSource): Boolean {
-        val sourceUrl = source.bookSourceUrl.substringBefore('#').trimEnd('/')
-        if (sourceUrl != "https://api.yousuu.com") return false
+    private fun isFanqieAggregateCommentProtocol(source: BookSource): Boolean {
+        val content = source.ruleContent?.content.orEmpty()
+        val searchBookUrl = source.ruleSearch?.bookUrl.orEmpty()
+        val exploreBookUrl = source.ruleExplore?.bookUrl.orEmpty()
 
-        val tocRule = source.ruleBookInfo?.tocUrl.orEmpty()
-        val legacyListRule = source.ruleToc?.chapterList.orEmpty()
-        val legacyContentRule = source.ruleContent?.content.orEmpty()
-
-        return tocRule.contains("/api/book/") &&
-            tocRule.contains("/comment") &&
-            legacyListRule.contains("data.comments") &&
-            legacyContentRule.contains("createrId.userName") &&
-            legacyContentRule.contains("createdAt") &&
-            legacyContentRule.contains("score") &&
-            legacyContentRule.contains("content")
+        return content.contains("/api/comment?book_id=") &&
+            content.contains("data.data.comment") &&
+            content.contains("user_info") &&
+            content.contains("user_name") &&
+            content.contains("digg_count") &&
+            content.contains("reply_count") &&
+            (searchBookUrl.contains("/api/detail?book_id=") ||
+                exploreBookUrl.contains("/api/detail?book_id="))
     }
 
-    internal fun isLegacyDoubanReviewProtocol(source: BookSource): Boolean {
+    private fun isYousuuCommentProtocol(source: BookSource): Boolean {
         val tocUrl = source.ruleBookInfo?.tocUrl.orEmpty()
         val chapterList = source.ruleToc?.chapterList.orEmpty()
         val chapterUrl = source.ruleToc?.chapterUrl.orEmpty()
         val content = source.ruleContent?.content.orEmpty()
 
-        return tocUrl.contains("baseUrl+'reviews'") &&
-            tocUrl.contains("comments/") &&
-            chapterList.contains("review-list") &&
-            chapterUrl.contains("href") &&
-            content.contains("review-content") &&
-            content.contains("class.comment")
+        val hasCommentEndpoint = tocUrl.contains("/comment") ||
+            chapterUrl.contains("/comment") || chapterList.contains("/comment")
+        val hasReviewList = chapterList.contains("data.comments") ||
+            chapterList.contains("书评")
+        val hasReviewFields = content.contains("createrId.userName") &&
+            content.contains("score") && content.contains("content") &&
+            (content.contains("createdAt") || content.contains("praiseCount"))
+
+        return hasCommentEndpoint && hasReviewList && hasReviewFields
+    }
+
+    internal fun isLegacyDoubanReviewProtocol(source: BookSource): Boolean {
+        val sourceUrl = source.bookSourceUrl.substringBefore('#')
+        val tocUrl = source.ruleBookInfo?.tocUrl.orEmpty()
+        val chapterList = source.ruleToc?.chapterList.orEmpty()
+        val chapterUrl = source.ruleToc?.chapterUrl.orEmpty()
+        val content = source.ruleContent?.content.orEmpty()
+
+        val hasReviewList = chapterList.contains("review-list") ||
+            chapterList.contains("review-item")
+        val hasReviewContent = content.contains("review-content")
+        val hasReviewUrl = tocUrl.contains("reviews") || sourceUrl.contains("douban.com")
+
+        return hasReviewUrl && hasReviewList &&
+            chapterUrl.contains("href") && hasReviewContent
     }
 
     private fun isQqDetailCommentListProtocol(source: BookSource): Boolean {
