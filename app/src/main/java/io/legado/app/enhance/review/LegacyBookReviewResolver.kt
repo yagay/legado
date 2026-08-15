@@ -117,7 +117,7 @@ internal object LegacyBookReviewResolver {
             legacyContentRule.contains("content")
     }
 
-    private fun isLegacyDoubanReviewProtocol(source: BookSource): Boolean {
+    internal fun isLegacyDoubanReviewProtocol(source: BookSource): Boolean {
         val tocUrl = source.ruleBookInfo?.tocUrl.orEmpty()
         val chapterList = source.ruleToc?.chapterList.orEmpty()
         val chapterUrl = source.ruleToc?.chapterUrl.orEmpty()
