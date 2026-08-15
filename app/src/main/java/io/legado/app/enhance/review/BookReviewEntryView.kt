@@ -8,18 +8,14 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.setPadding
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.rule.ReviewRule
-import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.ReviewDetailDialog
 import io.legado.app.ui.widget.text.AccentBgTextView
 import io.legado.app.utils.dpToPx
@@ -35,10 +31,8 @@ import kotlinx.coroutines.withContext
  * The normal path uses source.ruleReview. LegacyBookReviewResolver is a conservative compatibility
  * bridge for old sources that already expose whole-book reviews through toc/content rules.
  *
- * ReviewDetailDialog currently resolves its book/source/rule from ReadBook and BookSource. Until
- * its loader is separated from the dialog, this view scopes those values to the dialog lifetime
- * and restores them when the dialog is destroyed. Parsing, paging, replies, image and audio UI are
- * still provided by the existing review implementation.
+ * The dialog receives an explicit ReviewContext, so opening book reviews does not mutate ReadBook
+ * or the persisted/in-memory BookSource rule. Parsing, paging, image and audio UI stay shared.
  */
 class BookReviewEntryView @JvmOverloads constructor(
     context: Context,
@@ -146,53 +140,11 @@ class BookReviewEntryView @JvmOverloads constructor(
         val source = boundSource ?: return
         val rule = boundRule ?: return
 
-        activity.lifecycleScope.launch(IO) {
-            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, 0)
-            withContext(Main) {
-                if (chapter == null) {
-                    Toast.makeText(context, R.string.loading, Toast.LENGTH_SHORT).show()
-                    return@withContext
-                }
-
-                val previousBook = ReadBook.book
-                val previousSource = ReadBook.bookSource
-                val previousRule = source.ruleReview
-
-                source.ruleReview = rule
-                ReadBook.book = book
-                ReadBook.bookSource = source
-
-                val dialog = ReviewDetailDialog(
-                    paragraphNum = BOOK_REVIEW_INDEX,
-                    totalCount = 0,
-                    chapterIndex = chapter.index,
-                    paragraphData = "",
-                    bookUrl = book.bookUrl,
-                    sourceKey = source.getKey(),
-                    ruleHash = rule.hashCode(),
-                )
-                val manager = activity.supportFragmentManager
-                val callback = object : FragmentManager.FragmentLifecycleCallbacks() {
-                    override fun onFragmentDestroyed(fm: FragmentManager, f: Fragment) {
-                        if (f !== dialog) return
-                        source.ruleReview = previousRule
-                        if (ReadBook.book === book) ReadBook.book = previousBook
-                        if (ReadBook.bookSource === source) ReadBook.bookSource = previousSource
-                        fm.unregisterFragmentLifecycleCallbacks(this)
-                    }
-                }
-                manager.registerFragmentLifecycleCallbacks(callback, false)
-                runCatching {
-                    dialog.show(manager, TAG)
-                }.onFailure {
-                    manager.unregisterFragmentLifecycleCallbacks(callback)
-                    source.ruleReview = previousRule
-                    if (ReadBook.book === book) ReadBook.book = previousBook
-                    if (ReadBook.bookSource === source) ReadBook.bookSource = previousSource
-                    throw it
-                }
-            }
-        }
+        ReviewDetailDialog(
+            reviewContext = ReviewContext.BookReview(source, book),
+            rule = rule,
+            totalCount = 0,
+        ).show(activity.supportFragmentManager, TAG)
     }
 
     private tailrec fun Context.findActivity(): AppCompatActivity? = when (this) {
@@ -202,8 +154,6 @@ class BookReviewEntryView @JvmOverloads constructor(
     }
 
     companion object {
-        /** Reserved non-paragraph index used only by the enhance BookReview bridge. */
-        private const val BOOK_REVIEW_INDEX = -1
         private const val TAG = "book_review_detail"
     }
 }

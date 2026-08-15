@@ -39,6 +39,11 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.enhance.review.ReviewLoader
+import io.legado.app.enhance.review.ReviewContext
+import io.legado.app.enhance.review.ReviewDialogSessionStore
+import io.legado.app.enhance.review.chapterForAnalyze
+import io.legado.app.enhance.review.paragraphDataForAnalyze
+import io.legado.app.enhance.review.paragraphIndexForAnalyze
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.help.glide.ImageLoader
@@ -92,6 +97,20 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         }
     }
 
+    constructor(
+        reviewContext: ReviewContext,
+        rule: io.legado.app.data.entities.rule.ReviewRule? = null,
+        totalCount: Int = 0,
+    ) : this() {
+        val sessionId = ReviewDialogSessionStore.put(reviewContext, rule)
+        arguments = Bundle().apply {
+            putString("reviewSessionId", sessionId)
+            putInt(ARG_TOTAL_COUNT, totalCount)
+            putString(ARG_SOURCE_KEY, reviewContext.source.getKey())
+            putInt(ARG_RULE_HASH, (rule ?: reviewContext.source.ruleReview)?.hashCode() ?: 0)
+        }
+    }
+
     private val binding by viewBinding(DialogRecyclerViewBinding::bind)
     private val adapter by lazy { ReviewAdapter(requireContext()) }
     private var paragraphNum: Int = 0
@@ -101,6 +120,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
     private var bookUrl: String = ""
     private var sourceKey: String = ""
     private var ruleHash: Int = 0
+    private var reviewSessionId: String = ""
     private var isLoading = false
     private var hasMore = true
     private var currentPage = 1
@@ -210,6 +230,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         bookUrl = arguments?.getString(ARG_BOOK_URL).orEmpty()
         sourceKey = arguments?.getString(ARG_SOURCE_KEY).orEmpty()
         ruleHash = arguments?.getInt(ARG_RULE_HASH) ?: 0
+        reviewSessionId = arguments?.getString("reviewSessionId").orEmpty()
         binding.root.setBackgroundResource(R.drawable.bg_dialog_round_top)
         binding.dragHandle.visible()
         binding.toolBar.setBackgroundResource(R.drawable.bg_review_toolbar)
@@ -342,6 +363,7 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
 
     override fun onDestroyView() {
         releaseAudioPlayer()
+        ReviewDialogSessionStore.remove(reviewSessionId)
         super.onDestroyView()
     }
 
@@ -440,6 +462,27 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         if (!hasMore) return
         isLoading = true
         Coroutine.async(lifecycleScope, IO, start = CoroutineStart.LAZY) {
+            val session = ReviewDialogSessionStore.get(reviewSessionId)
+            if (session != null) {
+                val reviewContext = session.context
+                val source = reviewContext.source
+                val rule = session.rule ?: source.ruleReview
+                return@async ReviewLoader.loadDetail(
+                    ReviewLoader.DetailRequest(
+                        source = source,
+                        book = reviewContext.book,
+                        chapter = reviewContext.chapterForAnalyze(),
+                        paragraphIndex = reviewContext.paragraphIndexForAnalyze(),
+                        paragraphData = reviewContext.paragraphDataForAnalyze(),
+                        page = page,
+                        ruleHash = rule?.hashCode() ?: ruleHash,
+                        nextPageUrl = nextPageUrl,
+                        ruleOverride = session.rule,
+                    ),
+                    coroutineContext = coroutineContext,
+                )
+            }
+
             val source = ReadBook.bookSource ?: return@async null
             if (source.getKey() != sourceKey) return@async null
             val book = ReadBook.book ?: return@async null
