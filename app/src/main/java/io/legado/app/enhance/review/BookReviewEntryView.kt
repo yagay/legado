@@ -92,39 +92,60 @@ class BookReviewEntryView @JvmOverloads constructor(
 
     fun bind(book: Book, source: BookSource?) {
         explicitlyBound = true
-        countJob?.cancel()
-        countJob = null
-        boundTotalCount = null
-        titleView.text = context.getString(R.string.book_review)
-
         val effectiveRule = ReviewCapabilityResolver.resolveBookReview(source, book)
         if (source == null || effectiveRule == null) {
+            countJob?.cancel()
+            countJob = null
             boundBook = null
             boundSource = null
             boundRule = null
+            boundTotalCount = null
+            titleView.text = context.getString(R.string.book_review)
             visibility = View.GONE
             return
         }
+
+        val sameTarget = boundBook?.bookUrl == book.bookUrl &&
+            boundSource?.getKey() == source.getKey() &&
+            boundRule?.hashCode() == effectiveRule.hashCode()
 
         boundBook = book
         boundSource = source
         boundRule = effectiveRule
         visibility = View.VISIBLE
-        loadTotalCount(source, book)
+
+        if (sameTarget) {
+            boundTotalCount?.let {
+                titleView.text = context.getString(R.string.book_review_with_count, it)
+            }
+            if (boundTotalCount != null || countJob?.isActive == true) return
+        } else {
+            countJob?.cancel()
+            countJob = null
+            boundTotalCount = null
+            titleView.text = context.getString(R.string.book_review)
+        }
+
+        loadTotalCount(source, book, effectiveRule)
     }
 
-    private fun loadTotalCount(source: BookSource, book: Book) {
+    private fun loadTotalCount(source: BookSource, book: Book, rule: ReviewRule) {
         val activity = context.findActivity() ?: return
         val sourceKey = source.getKey()
         val bookUrl = book.bookUrl
+        val ruleHash = rule.hashCode()
         countJob = activity.lifecycleScope.launch(IO) {
             val totalCount = BookReviewCountLoader.loadExactCount(
                 source = source,
                 book = book,
+                rule = rule,
                 coroutineContext = coroutineContext,
             ) ?: return@launch
             withContext(Main) {
-                if (boundSource?.getKey() != sourceKey || boundBook?.bookUrl != bookUrl) {
+                if (boundSource?.getKey() != sourceKey ||
+                    boundBook?.bookUrl != bookUrl ||
+                    boundRule?.hashCode() != ruleHash
+                ) {
                     return@withContext
                 }
                 boundTotalCount = totalCount
