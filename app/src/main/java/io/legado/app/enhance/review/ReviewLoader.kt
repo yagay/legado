@@ -11,13 +11,26 @@ import io.legado.app.model.jsSource.JsSourceReview
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Shared network/parser layer for review detail pages and replies.
+ * Shared network/parser layer for review summary, detail pages and replies.
  *
  * The UI decides which book/chapter/paragraph context to use; this loader only executes the
- * source review protocol. Keeping that responsibility out of ReviewDetailDialog lets book,
+ * source review protocol. Keeping that responsibility out of activities/dialogs lets book,
  * chapter and paragraph review entries reuse the same parser and paging behavior.
  */
 internal object ReviewLoader {
+
+    data class SummaryRequest(
+        val source: BookSource,
+        val book: Book,
+        val chapter: BookChapter,
+        val ruleHash: Int,
+        val ruleOverride: ReviewRule? = null,
+    )
+
+    data class SummaryResult(
+        val summary: ReviewRuleParser.SummaryResult,
+        val source: BaseSource,
+    )
 
     data class DetailRequest(
         val source: BookSource,
@@ -56,6 +69,48 @@ internal object ReviewLoader {
         val page: Int,
         val source: BaseSource,
     )
+
+    suspend fun loadSummary(
+        request: SummaryRequest,
+        coroutineContext: CoroutineContext,
+    ): SummaryResult? {
+        val source = request.source
+        val book = request.book
+        val chapter = request.chapter
+        if (chapter.isVolume) return null
+
+        if (source.isJsSource() && request.ruleOverride == null) {
+            if (source.mainJs.hashCode() != request.ruleHash) return null
+            val summary = JsSourceReview.getReviewSummaryAwait(source, book, chapter)
+                ?: return null
+            return SummaryResult(summary = summary, source = source)
+        }
+
+        val rule = request.ruleOverride ?: source.ruleReview ?: return null
+        if (!rule.enabled || rule.hashCode() != request.ruleHash) return null
+        val summaryUrl = rule.configuredSummaryUrl() ?: return null
+        val analyzeUrl = AnalyzeUrl(
+            summaryUrl,
+            baseUrl = chapter.url,
+            source = source,
+            ruleData = book,
+            chapter = chapter,
+            coroutineContext = coroutineContext,
+        )
+        val body = analyzeUrl.getStrResponseAwait(useWebView = false).body ?: return null
+        return SummaryResult(
+            summary = ReviewRuleParser.parseSummary(
+                body,
+                rule,
+                source,
+                book,
+                chapter,
+                analyzeUrl.url,
+                coroutineContext,
+            ),
+            source = source,
+        )
+    }
 
     suspend fun loadDetail(
         request: DetailRequest,
