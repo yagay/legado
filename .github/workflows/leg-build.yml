@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: leg-branch-build
@@ -18,18 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: leg
-      - name: Integrate legacy paragraph reviews
-        run: |
-          python .github/scripts/legacy_para_review_patch.py
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt
-            git commit -m "route legacy paragraph comments through native review UI"
-            git push origin HEAD:leg
-          fi
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
