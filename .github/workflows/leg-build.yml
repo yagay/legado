@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: leg-branch-build
@@ -18,18 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: leg
-      - name: Apply book review binding patch
-        run: |
-          python .github/scripts/patch_book_review_binding.py
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add app/src/main/java/io/legado/app/ui/book/info/BookInfoActivity.kt
-            git commit -m "bind book review entry to current source [skip ci]"
-            git push origin HEAD:leg
-          fi
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
