@@ -42,6 +42,7 @@ import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.rule.ReviewRule
+import io.legado.app.enhance.review.LegacyParagraphReviewResolver
 import io.legado.app.enhance.review.ReviewContext
 import io.legado.app.enhance.review.ReviewLoader
 import io.legado.app.exception.NoStackTraceException
@@ -1781,10 +1782,12 @@ class ReadBookActivity : BaseReadBookActivity(),
         val rule = if (source.isJsSource()) {
             null
         } else {
-            source.ruleReview ?: run {
-                toastOnUi(R.string.review_rule_missing)
-                return
-            }
+            source.ruleReview
+                ?: LegacyParagraphReviewResolver.resolve(source, reviewData)
+                ?: run {
+                    toastOnUi(R.string.review_rule_missing)
+                    return
+                }
         }
         if (rule != null) {
             if (!rule.enabled) {
