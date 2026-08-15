@@ -43,6 +43,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.rule.ReviewRule
 import io.legado.app.enhance.review.ReviewContext
+import io.legado.app.enhance.review.ReviewLoader
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.HighlightColors
@@ -1849,25 +1850,15 @@ class ReadBookActivity : BaseReadBookActivity(),
             return
         }
 
-        if (source.isJsSource()) {
-            loadJsReviewSummaryIfNeeded(book, source, chapterIndex)
-            return
-        }
-        val rule = source.ruleReview ?: run {
+        val reviewHash = reviewSummaryHash(source) ?: run {
             clearReviewSummaryProviders()
             return
         }
-        val summaryUrl = rule.configuredSummaryUrl()
-        if (summaryUrl == null) {
-            clearReviewSummaryProviders()
-            return
-        }
-
-        val key = buildReviewSummaryKey(book, source, rule.hashCode(), chapterIndex)
+        val key = buildReviewSummaryKey(book, source, reviewHash, chapterIndex)
         if (reviewSummaryAppliedKey == key || reviewSummaryLoadingKey == key) return
         synchronized(reviewSummaryCache) { reviewSummaryCache[key] }?.let { cached ->
             applyReviewSummary(key, chapterIndex, cached)
-            prefetchAdjacentReviewSummary(book, source, rule, chapterIndex)
+            prefetchAdjacentReviewSummary(book, source, reviewHash, chapterIndex)
             return
         }
 
@@ -1879,99 +1870,25 @@ class ReadBookActivity : BaseReadBookActivity(),
         Coroutine.async(lifecycleScope, IO) {
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
                 ?: return@async null
-            if (chapter.isVolume) return@async null
-            val analyzeUrl = AnalyzeUrl(
-                summaryUrl,
-                baseUrl = chapter.url,
-                source = source,
-                ruleData = book,
-                chapter = chapter,
-                coroutineContext = coroutineContext
-            )
-            val body = analyzeUrl.getStrResponseAwait(useWebView = false).body
-                ?: return@async null
-            ReviewRuleParser.parseSummary(
-                body,
-                rule,
-                source,
-                book,
-                chapter,
-                analyzeUrl.url,
-                coroutineContext
-            )
+            ReviewLoader.loadSummary(
+                ReviewLoader.SummaryRequest(
+                    source = source,
+                    book = book,
+                    chapter = chapter,
+                    ruleHash = reviewHash,
+                ),
+                coroutineContext = coroutineContext,
+            )?.summary
         }.onSuccess(Main) { result ->
             releaseReviewSummaryLoadingKey(key)
             if (requestToken != reviewSummaryRequestToken) return@onSuccess
             val currentBook = ReadBook.book ?: return@onSuccess
             val currentSource = ReadBook.bookSource ?: return@onSuccess
-            val currentRule = currentSource.ruleReview ?: return@onSuccess
+            val currentHash = reviewSummaryHash(currentSource) ?: return@onSuccess
             val currentKey = buildReviewSummaryKey(
                 currentBook,
                 currentSource,
-                currentRule.hashCode(),
-                ReadBook.durChapterIndex
-            )
-            if (currentKey != key) return@onSuccess
-            if (result == null) {
-                ChapterProvider.clearReviewProviders()
-                return@onSuccess
-            }
-            synchronized(reviewSummaryCache) {
-                reviewSummaryCache[key] = result
-            }
-            applyReviewSummary(key, chapterIndex, result)
-            prefetchAdjacentReviewSummary(book, source, rule, chapterIndex)
-        }.onError {
-            releaseReviewSummaryLoadingKey(key)
-            if (requestToken != reviewSummaryRequestToken) return@onError
-            val currentBook = ReadBook.book ?: return@onError
-            val currentSource = ReadBook.bookSource ?: return@onError
-            val currentRule = currentSource.ruleReview ?: return@onError
-            if (buildReviewSummaryKey(
-                    currentBook,
-                    currentSource,
-                    currentRule.hashCode(),
-                    ReadBook.durChapterIndex
-                ) != key
-            ) return@onError
-            ChapterProvider.clearReviewProviders()
-            AppLog.put("加载段评统计出错\n${it.localizedMessage}", it)
-        }
-    }
-
-    private fun loadJsReviewSummaryIfNeeded(
-        book: Book,
-        source: BookSource,
-        chapterIndex: Int,
-    ) {
-        val sourceHash = source.mainJs.hashCode()
-        val key = buildReviewSummaryKey(book, source, sourceHash, chapterIndex)
-        if (reviewSummaryAppliedKey == key || reviewSummaryLoadingKey == key) return
-        synchronized(reviewSummaryCache) { reviewSummaryCache[key] }?.let { cached ->
-            applyReviewSummary(key, chapterIndex, cached)
-            return
-        }
-
-        reviewSummaryLoadingKey = key
-        val requestToken = ++reviewSummaryRequestToken
-        if (reviewSummaryAppliedKey != key) {
-            ChapterProvider.clearReviewProviders()
-        }
-        Coroutine.async(lifecycleScope, IO) {
-            val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
-                ?: return@async null
-            if (chapter.isVolume) return@async null
-            JsSourceReview.getReviewSummaryAwait(source, book, chapter)
-        }.onSuccess(Main) { result ->
-            releaseReviewSummaryLoadingKey(key)
-            if (requestToken != reviewSummaryRequestToken) return@onSuccess
-            val currentBook = ReadBook.book ?: return@onSuccess
-            val currentSource = ReadBook.bookSource ?: return@onSuccess
-            if (!currentSource.isJsSource()) return@onSuccess
-            val currentKey = buildReviewSummaryKey(
-                currentBook,
-                currentSource,
-                currentSource.mainJs.hashCode(),
+                currentHash,
                 ReadBook.durChapterIndex,
             )
             if (currentKey != key) return@onSuccess
@@ -1984,22 +1901,30 @@ class ReadBookActivity : BaseReadBookActivity(),
                 reviewSummaryCache[key] = result
             }
             applyReviewSummary(key, chapterIndex, result)
+            prefetchAdjacentReviewSummary(book, source, reviewHash, chapterIndex)
         }.onError {
             releaseReviewSummaryLoadingKey(key)
             if (requestToken != reviewSummaryRequestToken) return@onError
             val currentBook = ReadBook.book ?: return@onError
             val currentSource = ReadBook.bookSource ?: return@onError
-            if (!currentSource.isJsSource()) return@onError
+            val currentHash = reviewSummaryHash(currentSource) ?: return@onError
             if (buildReviewSummaryKey(
                     currentBook,
                     currentSource,
-                    currentSource.mainJs.hashCode(),
+                    currentHash,
                     ReadBook.durChapterIndex,
                 ) != key
             ) return@onError
             ChapterProvider.clearReviewProviders()
-            AppLog.put("加载 JavaScript 段评统计出错\n${it.localizedMessage}", it)
+            AppLog.put("加载评论统计出错\n${it.localizedMessage}", it)
         }
+    }
+
+    private fun reviewSummaryHash(source: BookSource): Int? {
+        if (source.isJsSource()) return source.mainJs.hashCode()
+        val rule = source.ruleReview ?: return null
+        if (!rule.enabled || rule.configuredSummaryUrl() == null) return null
+        return rule.hashCode()
     }
 
     private fun clearReviewSummaryProviders() {
@@ -2029,9 +1954,9 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     private fun prefetchAdjacentReviewSummary(
         book: Book,
-        source: BaseSource,
-        rule: ReviewRule,
-        chapterIndex: Int
+        source: BookSource,
+        reviewHash: Int,
+        chapterIndex: Int,
     ) {
         val maxIndex = if (ReadBook.simulatedChapterSize > 0) {
             ReadBook.simulatedChapterSize
@@ -2046,11 +1971,11 @@ class ReadBookActivity : BaseReadBookActivity(),
             val loadedChapter = sequenceOf(
                 ReadBook.prevTextChapter,
                 ReadBook.curTextChapter,
-                ReadBook.nextTextChapter
+                ReadBook.nextTextChapter,
             ).filterNotNull().firstOrNull { it.chapter.index == targetIndex }
             if (loadedChapter == null || !loadedChapter.hasBodyContent) continue
 
-            val key = buildReviewSummaryKey(book, source, rule.hashCode(), targetIndex)
+            val key = buildReviewSummaryKey(book, source, reviewHash, targetIndex)
             if (reviewSummaryLoadingKey == key) continue
             if (synchronized(reviewSummaryCache) { reviewSummaryCache.containsKey(key) }) continue
             val shouldPrefetch = synchronized(reviewSummaryPrefetchingKeys) {
@@ -2061,28 +1986,15 @@ class ReadBookActivity : BaseReadBookActivity(),
             Coroutine.async(lifecycleScope, IO) {
                 val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, targetIndex)
                     ?: return@async null
-                if (chapter.isVolume) return@async null
-                val summaryUrl = rule.reviewSummaryUrl?.takeIf { it.isNotBlank() }
-                    ?: return@async null
-                val analyzeUrl = AnalyzeUrl(
-                    summaryUrl,
-                    baseUrl = chapter.url,
-                    source = source,
-                    ruleData = book,
-                    chapter = chapter,
-                    coroutineContext = coroutineContext
-                )
-                val body = analyzeUrl.getStrResponseAwait(useWebView = false).body
-                    ?: return@async null
-                ReviewRuleParser.parseSummary(
-                    body,
-                    rule,
-                    source,
-                    book,
-                    chapter,
-                    analyzeUrl.url,
-                    coroutineContext
-                )
+                ReviewLoader.loadSummary(
+                    ReviewLoader.SummaryRequest(
+                        source = source,
+                        book = book,
+                        chapter = chapter,
+                        ruleHash = reviewHash,
+                    ),
+                    coroutineContext = coroutineContext,
+                )?.summary
             }.onSuccess(Main) { result ->
                 synchronized(reviewSummaryPrefetchingKeys) {
                     reviewSummaryPrefetchingKeys.remove(key)
