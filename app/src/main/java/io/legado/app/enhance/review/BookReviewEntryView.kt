@@ -18,6 +18,7 @@ import io.legado.app.R
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.rule.ReviewRule
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.ReviewDetailDialog
 import io.legado.app.ui.widget.text.AccentBgTextView
@@ -31,15 +32,13 @@ import kotlinx.coroutines.withContext
 /**
  * Book detail entry for book-level reviews.
  *
- * This view intentionally lives in enhance/ so BookInfoActivity and ReviewRule stay as close to
- * upstream as possible. A book-level review rule is distinguished from paragraph reviews by not
- * declaring summaryParagraphIndexRule. Existing paragraph-review rules therefore keep their
- * current reader-only behaviour.
+ * The normal path uses source.ruleReview. LegacyBookReviewResolver is a conservative compatibility
+ * bridge for old sources that already expose whole-book reviews through toc/content rules.
  *
- * ReviewDetailDialog currently resolves its book/source from ReadBook. Until its loader is
- * separated from the dialog, this view scopes those values to the lifetime of the dialog and
- * restores the previous values when the dialog is destroyed. The actual review parsing, paging,
- * replies, image and audio UI remain fully reused from upstream.
+ * ReviewDetailDialog currently resolves its book/source/rule from ReadBook and BookSource. Until
+ * its loader is separated from the dialog, this view scopes those values to the dialog lifetime
+ * and restores them when the dialog is destroyed. Parsing, paging, replies, image and audio UI are
+ * still provided by the existing review implementation.
  */
 class BookReviewEntryView @JvmOverloads constructor(
     context: Context,
@@ -48,6 +47,7 @@ class BookReviewEntryView @JvmOverloads constructor(
 
     private var boundBook: Book? = null
     private var boundSource: BookSource? = null
+    private var boundRule: ReviewRule? = null
 
     init {
         orientation = HORIZONTAL
@@ -115,30 +115,36 @@ class BookReviewEntryView @JvmOverloads constructor(
     }
 
     private fun bind(book: Book, source: BookSource?) {
-        val rule = source?.ruleReview
-        val hasBookReview = rule?.enabled == true &&
-            !rule.reviewDetailUrl.isNullOrBlank() &&
-            !rule.detailListRule.isNullOrBlank() &&
-            !rule.detailContentRule.isNullOrBlank() &&
-            rule.summaryParagraphIndexRule.isNullOrBlank()
+        val nativeRule = source?.ruleReview?.takeIf(::isBookReviewRule)
+        val effectiveRule = nativeRule ?: source?.let { LegacyBookReviewResolver.resolve(it, book) }
 
-        if (!hasBookReview) {
+        if (source == null || effectiveRule == null) {
             boundBook = null
             boundSource = null
+            boundRule = null
             visibility = View.GONE
             return
         }
 
         boundBook = book
         boundSource = source
+        boundRule = effectiveRule
         visibility = View.VISIBLE
+    }
+
+    private fun isBookReviewRule(rule: ReviewRule): Boolean {
+        return rule.enabled &&
+            !rule.reviewDetailUrl.isNullOrBlank() &&
+            !rule.detailListRule.isNullOrBlank() &&
+            !rule.detailContentRule.isNullOrBlank() &&
+            rule.summaryParagraphIndexRule.isNullOrBlank()
     }
 
     private fun openBookReview() {
         val activity = context.findActivity() ?: return
         val book = boundBook ?: return
         val source = boundSource ?: return
-        val rule = source.ruleReview ?: return
+        val rule = boundRule ?: return
 
         activity.lifecycleScope.launch(IO) {
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, 0)
@@ -150,6 +156,9 @@ class BookReviewEntryView @JvmOverloads constructor(
 
                 val previousBook = ReadBook.book
                 val previousSource = ReadBook.bookSource
+                val previousRule = source.ruleReview
+
+                source.ruleReview = rule
                 ReadBook.book = book
                 ReadBook.bookSource = source
 
@@ -166,6 +175,7 @@ class BookReviewEntryView @JvmOverloads constructor(
                 val callback = object : FragmentManager.FragmentLifecycleCallbacks() {
                     override fun onFragmentDestroyed(fm: FragmentManager, f: Fragment) {
                         if (f !== dialog) return
+                        source.ruleReview = previousRule
                         if (ReadBook.book === book) ReadBook.book = previousBook
                         if (ReadBook.bookSource === source) ReadBook.bookSource = previousSource
                         fm.unregisterFragmentLifecycleCallbacks(this)
@@ -176,6 +186,7 @@ class BookReviewEntryView @JvmOverloads constructor(
                     dialog.show(manager, TAG)
                 }.onFailure {
                     manager.unregisterFragmentLifecycleCallbacks(callback)
+                    source.ruleReview = previousRule
                     if (ReadBook.book === book) ReadBook.book = previousBook
                     if (ReadBook.bookSource === source) ReadBook.bookSource = previousSource
                     throw it
