@@ -22,6 +22,7 @@ import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -40,7 +41,10 @@ class BookReviewEntryView @JvmOverloads constructor(
     private var boundBook: Book? = null
     private var boundSource: BookSource? = null
     private var boundRule: ReviewRule? = null
+    private var boundTotalCount: Int? = null
+    private var countJob: Job? = null
     private var explicitlyBound = false
+    private lateinit var titleView: TextView
 
     init {
         orientation = HORIZONTAL
@@ -57,7 +61,7 @@ class BookReviewEntryView @JvmOverloads constructor(
             setColorFilter(context.getCompatColor(R.color.tv_text_summary), PorterDuff.Mode.SRC_IN)
         })
 
-        addView(TextView(context).apply {
+        titleView = TextView(context).apply {
             layoutParams = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginEnd = 6.dpToPx()
             }
@@ -66,7 +70,8 @@ class BookReviewEntryView @JvmOverloads constructor(
             textSize = 13f
             includeFontPadding = false
             maxLines = 1
-        })
+        }
+        addView(titleView)
 
         addView(AccentBgTextView(context).apply {
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
@@ -87,8 +92,12 @@ class BookReviewEntryView @JvmOverloads constructor(
 
     fun bind(book: Book, source: BookSource?) {
         explicitlyBound = true
-        val effectiveRule = ReviewCapabilityResolver.resolveBookReview(source, book)
+        countJob?.cancel()
+        countJob = null
+        boundTotalCount = null
+        titleView.text = context.getString(R.string.book_review)
 
+        val effectiveRule = ReviewCapabilityResolver.resolveBookReview(source, book)
         if (source == null || effectiveRule == null) {
             boundBook = null
             boundSource = null
@@ -101,6 +110,27 @@ class BookReviewEntryView @JvmOverloads constructor(
         boundSource = source
         boundRule = effectiveRule
         visibility = View.VISIBLE
+        loadTotalCount(source, book)
+    }
+
+    private fun loadTotalCount(source: BookSource, book: Book) {
+        val activity = context.findActivity() ?: return
+        val sourceKey = source.getKey()
+        val bookUrl = book.bookUrl
+        countJob = activity.lifecycleScope.launch(IO) {
+            val totalCount = BookReviewCountLoader.loadExactCount(
+                source = source,
+                book = book,
+                coroutineContext = coroutineContext,
+            ) ?: return@launch
+            withContext(Main) {
+                if (boundSource?.getKey() != sourceKey || boundBook?.bookUrl != bookUrl) {
+                    return@withContext
+                }
+                boundTotalCount = totalCount
+                titleView.text = context.getString(R.string.book_review_with_count, totalCount)
+            }
+        }
     }
 
     private fun resolveBookAndSource() {
@@ -134,7 +164,7 @@ class BookReviewEntryView @JvmOverloads constructor(
         ReviewDetailDialog(
             reviewContext = ReviewContext.BookReview(source, book),
             rule = rule,
-            totalCount = 0,
+            totalCount = boundTotalCount ?: 0,
         ).show(activity.supportFragmentManager, TAG)
     }
 
