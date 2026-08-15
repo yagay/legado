@@ -22,14 +22,6 @@ internal object LegacyBookReviewResolver {
             ?: resolveJjwxcBookComments(source, book)
     }
 
-    /**
-     * Third-party Fanqie aggregate APIs that historically append whole-book comments from
-     * /api/comment into every chapter body. Move that protocol into the shared review UI instead.
-     *
-     * Older source rules only consumed name/text/score/counts even when the upstream response
-     * contained richer metadata. Probe the common response shapes here so avatar/time/images/tags
-     * survive when the API provides them; missing fields simply resolve to blank values.
-     */
     private fun resolveFanqieAggregateComments(source: BookSource, book: Book): ReviewRule? {
         if (!isFanqieAggregateCommentProtocol(source)) return null
 
@@ -88,10 +80,7 @@ internal object LegacyBookReviewResolver {
     private fun resolveYousuu(source: BookSource, book: Book): ReviewRule? {
         if (!isYousuuCommentProtocol(source)) return null
 
-        val bookUrl = book.bookUrl
-            .substringBefore('#')
-            .substringBefore('?')
-            .trimEnd('/')
+        val bookUrl = book.bookUrl.substringBefore('#').substringBefore('?').trimEnd('/')
         if (!bookUrl.contains("/book/")) return null
         val detailUrl = if (bookUrl.contains("/api/book/")) {
             "$bookUrl/comment?type=latest&page=1"
@@ -117,10 +106,7 @@ internal object LegacyBookReviewResolver {
     private fun resolveDoubanShortComments(source: BookSource, book: Book): ReviewRule? {
         if (!isLegacyDoubanReviewProtocol(source)) return null
 
-        val bookUrl = book.bookUrl
-            .substringBefore('#')
-            .substringBefore('?')
-            .trimEnd('/')
+        val bookUrl = book.bookUrl.substringBefore('#').substringBefore('?').trimEnd('/')
         if (!bookUrl.contains("douban.com/subject/")) return null
 
         return ReviewRule(
@@ -131,8 +117,7 @@ internal object LegacyBookReviewResolver {
             detailAvatarRule = "class.avatar@tag.img@src||tag.img.0@src",
             detailNameRule = "class.comment-info@tag.a.0@text||tag.a.0@text",
             detailBadgeRule = "class.rating@title||class.rating@class",
-            detailContentRule = "@js:var text=java.getString('class.short@text||class.comment-content@text||class.comment@tag.p@text');" +
-                "var tm=java.getString('class.comment-time@title||class.comment-time@text');JSON.stringify({text:text,time:tm})",
+            detailContentRule = "class.short@text||class.comment-content@text||class.comment@tag.p@text",
         )
     }
 
@@ -140,9 +125,7 @@ internal object LegacyBookReviewResolver {
         if (!isQqDetailCommentListProtocol(source)) return null
 
         val detailUrl = book.bookUrl.substringBefore('#')
-        if (!detailUrl.contains("detailadr.reader.qq.com/") || !detailUrl.contains("bid=")) {
-            return null
-        }
+        if (!detailUrl.contains("detailadr.reader.qq.com/") || !detailUrl.contains("bid=")) return null
         val contentRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);" +
             "JSON.stringify({text:String(c.content||c.text||''),time:String(c.time||c.create_time||c.created_at||'')," +
             "likeCount:Number(c.like_count||c.digg_count||0),replyCount:Number(c.reply_count||0)})"
@@ -162,10 +145,7 @@ internal object LegacyBookReviewResolver {
         if (!isJjwxcBookCommentProtocol(source)) return null
 
         val novelId = Regex("(?:novelId=|/book\\d?/)(\\d+)")
-            .find(book.bookUrl)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?: return null
+            .find(book.bookUrl)?.groupValues?.getOrNull(1) ?: return null
         val contentRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);" +
             "JSON.stringify({text:String(c.commentBody||''),time:String(c.commentDate||c.postTime||'')})"
 
@@ -182,10 +162,7 @@ internal object LegacyBookReviewResolver {
     }
 
     internal fun fanqieAggregateBookId(book: Book): String? {
-        return Regex("[?&]book_id=(\\d+)")
-            .find(book.bookUrl)
-            ?.groupValues
-            ?.getOrNull(1)
+        return Regex("[?&]book_id=(\\d+)").find(book.bookUrl)?.groupValues?.getOrNull(1)
     }
 
     internal fun isFanqieAggregateCommentProtocol(source: BookSource): Boolean {
@@ -199,8 +176,7 @@ internal object LegacyBookReviewResolver {
             content.contains("user_name") &&
             content.contains("digg_count") &&
             content.contains("reply_count") &&
-            (searchBookUrl.contains("/api/detail?book_id=") ||
-                exploreBookUrl.contains("/api/detail?book_id="))
+            (searchBookUrl.contains("/api/detail?book_id=") || exploreBookUrl.contains("/api/detail?book_id="))
     }
 
     private fun isYousuuCommentProtocol(source: BookSource): Boolean {
@@ -209,12 +185,9 @@ internal object LegacyBookReviewResolver {
         val chapterUrl = source.ruleToc?.chapterUrl.orEmpty()
         val content = source.ruleContent?.content.orEmpty()
 
-        val hasCommentEndpoint = tocUrl.contains("/comment") ||
-            chapterUrl.contains("/comment") || chapterList.contains("/comment")
-        val hasReviewList = chapterList.contains("data.comments") ||
-            chapterList.contains("书评")
-        val hasReviewFields = content.contains("createrId.userName") &&
-            content.contains("score") && content.contains("content") &&
+        val hasCommentEndpoint = tocUrl.contains("/comment") || chapterUrl.contains("/comment") || chapterList.contains("/comment")
+        val hasReviewList = chapterList.contains("data.comments") || chapterList.contains("书评")
+        val hasReviewFields = content.contains("createrId.userName") && content.contains("score") && content.contains("content") &&
             (content.contains("createdAt") || content.contains("praiseCount"))
 
         return hasCommentEndpoint && hasReviewList && hasReviewFields
@@ -227,13 +200,11 @@ internal object LegacyBookReviewResolver {
         val chapterUrl = source.ruleToc?.chapterUrl.orEmpty()
         val content = source.ruleContent?.content.orEmpty()
 
-        val hasReviewList = chapterList.contains("review-list") ||
-            chapterList.contains("review-item")
+        val hasReviewList = chapterList.contains("review-list") || chapterList.contains("review-item")
         val hasReviewContent = content.contains("review-content")
         val hasReviewUrl = tocUrl.contains("reviews") || sourceUrl.contains("douban.com")
 
-        return hasReviewUrl && hasReviewList &&
-            chapterUrl.contains("href") && hasReviewContent
+        return hasReviewUrl && hasReviewList && chapterUrl.contains("href") && hasReviewContent
     }
 
     private fun isQqDetailCommentListProtocol(source: BookSource): Boolean {
@@ -244,8 +215,7 @@ internal object LegacyBookReviewResolver {
 
         return infoIntro.contains("commentlist..content") &&
             tocUrl.contains("ubook.reader.qq.com/api/book/chapter-list") &&
-            (searchBookUrl.contains("detailadr.reader.qq.com/") ||
-                exploreBookUrl.contains("detailadr.reader.qq.com/"))
+            (searchBookUrl.contains("detailadr.reader.qq.com/") || exploreBookUrl.contains("detailadr.reader.qq.com/"))
     }
 
     internal fun isJjwxcBookCommentProtocol(source: BookSource): Boolean {
