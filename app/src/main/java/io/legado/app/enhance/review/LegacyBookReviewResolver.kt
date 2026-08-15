@@ -17,6 +17,7 @@ internal object LegacyBookReviewResolver {
     fun resolve(source: BookSource, book: Book): ReviewRule? {
         return resolveYousuu(source, book)
             ?: resolveDoubanShortComments(source, book)
+            ?: resolveQqDetailCommentList(source, book)
     }
 
     private fun resolveYousuu(source: BookSource, book: Book): ReviewRule? {
@@ -67,6 +68,31 @@ internal object LegacyBookReviewResolver {
         )
     }
 
+    /**
+     * Some QQ Reader legacy sources already receive a small whole-book commentlist in the normal
+     * book-detail JSON and append only commentlist.content to the introduction. Re-requesting the
+     * same book-detail URL lets the native review UI show those items without introducing another
+     * endpoint or changing the source JSON.
+     *
+     * This is intentionally a preview adapter: the legacy source does not expose a paged full
+     * review endpoint, so no next-page rule is fabricated here.
+     */
+    private fun resolveQqDetailCommentList(source: BookSource, book: Book): ReviewRule? {
+        if (!isQqDetailCommentListProtocol(source)) return null
+
+        val detailUrl = book.bookUrl.substringBefore('#')
+        if (!detailUrl.contains("detailadr.reader.qq.com/") || !detailUrl.contains("bid=")) {
+            return null
+        }
+
+        return ReviewRule(
+            enabled = true,
+            reviewDetailUrl = detailUrl,
+            detailListRule = "$..commentlist[*]",
+            detailContentRule = "$.content",
+        )
+    }
+
     private fun isYousuuCommentProtocol(source: BookSource): Boolean {
         val sourceUrl = source.bookSourceUrl.substringBefore('#').trimEnd('/')
         if (sourceUrl != "https://api.yousuu.com") return false
@@ -96,5 +122,17 @@ internal object LegacyBookReviewResolver {
             chapterUrl.contains("href") &&
             content.contains("review-content") &&
             content.contains("class.comment")
+    }
+
+    private fun isQqDetailCommentListProtocol(source: BookSource): Boolean {
+        val infoIntro = source.ruleBookInfo?.intro.orEmpty()
+        val tocUrl = source.ruleBookInfo?.tocUrl.orEmpty()
+        val searchBookUrl = source.ruleSearch?.bookUrl.orEmpty()
+        val exploreBookUrl = source.ruleExplore?.bookUrl.orEmpty()
+
+        return infoIntro.contains("commentlist..content") &&
+            tocUrl.contains("ubook.reader.qq.com/api/book/chapter-list") &&
+            (searchBookUrl.contains("detailadr.reader.qq.com/") ||
+                exploreBookUrl.contains("detailadr.reader.qq.com/"))
     }
 }
