@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: leg-branch-build
@@ -18,6 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Apply Douban long review patch
+        run: |
+          python .github/scripts/douban_long_review_patch.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/io/legado/app/enhance/review/ReviewLoader.kt
+          git diff --cached --quiet || git commit -m "load legacy Douban long reviews through ReviewLoader"
+          git push
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
