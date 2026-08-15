@@ -22,6 +22,7 @@ sealed interface ReviewContext {
         override val source: BookSource,
         override val book: Book,
         val chapter: BookChapter,
+        val reviewData: String = "",
     ) : ReviewContext
 
     data class ParagraphReview(
@@ -57,6 +58,7 @@ internal fun ReviewContext.paragraphIndexForAnalyze(): Int {
 
 internal fun ReviewContext.paragraphDataForAnalyze(): String {
     return when (this) {
+        is ReviewContext.ChapterReview -> reviewData
         is ReviewContext.ParagraphReview -> paragraphData
         else -> ""
     }
