@@ -4,6 +4,7 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.rule.ReviewRule
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.ReviewRuleParser
 import io.legado.app.model.jsSource.JsSourceReview
@@ -27,6 +28,7 @@ internal object ReviewLoader {
         val page: Int,
         val ruleHash: Int,
         val nextPageUrl: String? = null,
+        val ruleOverride: ReviewRule? = null,
     )
 
     data class DetailResult(
@@ -46,7 +48,7 @@ internal object ReviewLoader {
         val chapter = request.chapter
         val page = request.page
 
-        if (source.isJsSource()) {
+        if (source.isJsSource() && request.ruleOverride == null) {
             if (source.mainJs.hashCode() != request.ruleHash) return null
             val result = JsSourceReview.getReviewDetailAwait(
                 source = source,
@@ -65,7 +67,7 @@ internal object ReviewLoader {
             )
         }
 
-        val rule = source.ruleReview ?: return null
+        val rule = request.ruleOverride ?: source.ruleReview ?: return null
         if (!rule.enabled || rule.hashCode() != request.ruleHash) return null
 
         val firstPageUrlRule = rule.reviewDetailUrl?.takeIf { it.isNotBlank() } ?: return null
