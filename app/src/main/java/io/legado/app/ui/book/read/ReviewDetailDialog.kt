@@ -53,7 +53,6 @@ import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.getMediaItem
 import io.legado.app.model.analyzeRule.ReviewRuleParser
 import io.legado.app.model.analyzeRule.ReviewRuleParser.DetailItem as ReviewDetailItem
-import io.legado.app.model.jsSource.JsSourceReview
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.isAbsUrl
@@ -559,15 +558,35 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         val page = (replyPageByParentKey[parentKey] ?: 0) + 1
         renderUiItems()
         Coroutine.async(lifecycleScope, IO, start = CoroutineStart.LAZY) {
+            val session = ReviewDialogSessionStore.get(reviewSessionId)
+            if (session != null) {
+                val reviewContext = session.context
+                val source = reviewContext.source
+                val rule = session.rule ?: source.ruleReview
+                return@async ReviewLoader.loadReplies(
+                    ReviewLoader.ReplyRequest(
+                        source = source,
+                        book = reviewContext.book,
+                        chapter = reviewContext.chapterForAnalyze(),
+                        paragraphIndex = reviewContext.paragraphIndexForAnalyze(),
+                        paragraphData = reviewContext.paragraphDataForAnalyze(),
+                        reviewId = reviewId,
+                        page = page,
+                        ruleHash = rule?.hashCode() ?: ruleHash,
+                        ruleOverride = session.rule,
+                    ),
+                    coroutineContext = coroutineContext,
+                )
+            }
+
             val source = ReadBook.bookSource ?: return@async null
             if (source.getKey() != sourceKey) return@async null
             val book = ReadBook.book ?: return@async null
             if (book.bookUrl != bookUrl) return@async null
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
                 ?: return@async null
-            if (source.isJsSource()) {
-                if (source.mainJs.hashCode() != ruleHash) return@async null
-                val replies = JsSourceReview.getReviewRepliesAwait(
+            ReviewLoader.loadReplies(
+                ReviewLoader.ReplyRequest(
                     source = source,
                     book = book,
                     chapter = chapter,
@@ -575,54 +594,9 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
                     paragraphData = paragraphData,
                     reviewId = reviewId,
                     page = page,
-                ) ?: return@async null
-                return@async ReplyResult(
-                    replies = replies,
-                    page = page,
-                    source = source,
-                )
-            }
-            val rule = source.ruleReview ?: return@async null
-            if (!rule.enabled || rule.hashCode() != ruleHash) return@async null
-            val replyUrlRule = rule.reviewQuoteUrl?.takeIf { it.isNotBlank() }
-                ?: return@async null
-            if (rule.replyListRule.isNullOrBlank() || rule.replyContentRule.isNullOrBlank()) {
-                return@async null
-            }
-            val paraIndex = paragraphNum.toString()
-            val analyzeUrl = AnalyzeUrl(
-                replyUrlRule,
-                page = page,
-                extraParams = mapOf(
-                    "paraIndex" to paraIndex,
-                    "paraData" to paragraphData,
-                    "reviewId" to reviewId,
-                    "page" to page.toString(),
+                    ruleHash = ruleHash,
                 ),
-                baseUrl = chapter.url,
-                source = source,
-                ruleData = book,
-                chapter = chapter,
                 coroutineContext = coroutineContext,
-            )
-            val body = analyzeUrl.getStrResponseAwait(useWebView = false).body
-                ?.takeIf { it.isNotBlank() }
-                ?: error(getString(R.string.content_empty))
-            ReplyResult(
-                replies = ReviewRuleParser.parseReplyPage(
-                    body = body,
-                    rule = rule,
-                    baseUrl = analyzeUrl.url,
-                    source = source,
-                    book = book,
-                    chapter = chapter,
-                    context = coroutineContext,
-                    paraIndex = paraIndex,
-                    paraData = paragraphData,
-                    page = page.toString(),
-                ),
-                page = page,
-                source = source,
             )
         }.onSuccess(Main) { result ->
             replyLoadingParentKeys.remove(parentKey)
@@ -742,12 +716,6 @@ class ReviewDetailDialog() : BaseDialogFragment(R.layout.dialog_recycler_view) {
         val nextPageUrl: String?,
         val hasNextPageRule: Boolean,
         val hasReplyUrl: Boolean,
-        val source: BaseSource,
-    )
-
-    private data class ReplyResult(
-        val replies: List<ReviewDetailItem>,
-        val page: Int,
         val source: BaseSource,
     )
 
