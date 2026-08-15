@@ -1777,88 +1777,57 @@ class ReadBookActivity : BaseReadBookActivity(),
         val book = ReadBook.book ?: return
         val reviewData = ChapterProvider.getReviewKeyById(paragraphNum, chapterIndex).orEmpty()
 
-        if (source.isJsSource()) {
-            if (paragraphNum == -1) {
-                lifecycleScope.launch {
-                    val chapter = withContext(IO) {
-                        appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
-                    } ?: return@launch
-                    showDialogFragment(
-                        ReviewDetailDialog(
-                            reviewContext = ReviewContext.ChapterReview(
-                                source = source,
-                                book = book,
-                                chapter = chapter,
-                                reviewData = reviewData,
-                            ),
-                            totalCount = count,
-                        )
-                    )
-                }
+        val rule = if (source.isJsSource()) {
+            null
+        } else {
+            source.ruleReview ?: run {
+                toastOnUi(R.string.review_rule_missing)
+                return
+            }
+        }
+        if (rule != null) {
+            if (!rule.enabled) {
+                toastOnUi(R.string.review_rule_missing)
+                return
+            }
+            if (rule.reviewDetailUrl.isNullOrBlank()) {
+                toastOnUi(R.string.review_detail_url_missing)
+                return
+            }
+            if (rule.detailListRule.isNullOrBlank() || rule.detailContentRule.isNullOrBlank()) {
+                toastOnUi(R.string.review_detail_rule_missing)
+                return
+            }
+        }
+
+        lifecycleScope.launch {
+            val chapter = withContext(IO) {
+                appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
+            } ?: return@launch
+            val reviewContext = if (paragraphNum == -1) {
+                ReviewContext.ChapterReview(
+                    source = source,
+                    book = book,
+                    chapter = chapter,
+                    reviewData = reviewData,
+                )
             } else {
-                showDialogFragment(
-                    ReviewDetailDialog(
-                        paragraphNum = paragraphNum,
-                        totalCount = count,
-                        chapterIndex = chapterIndex,
-                        paragraphData = reviewData,
-                        bookUrl = book.bookUrl,
-                        sourceKey = source.getKey(),
-                        ruleHash = source.mainJs.hashCode(),
-                    )
+                ReviewContext.ParagraphReview(
+                    source = source,
+                    book = book,
+                    chapter = chapter,
+                    paragraphIndex = paragraphNum,
+                    paragraphData = reviewData,
                 )
             }
-            return
-        }
-        val rule = source.ruleReview ?: run {
-            toastOnUi(R.string.review_rule_missing)
-            return
-        }
-        if (!rule.enabled) {
-            toastOnUi(R.string.review_rule_missing)
-            return
-        }
-        if (rule.reviewDetailUrl.isNullOrBlank()) {
-            toastOnUi(R.string.review_detail_url_missing)
-            return
-        }
-        if (rule.detailListRule.isNullOrBlank() || rule.detailContentRule.isNullOrBlank()) {
-            toastOnUi(R.string.review_detail_rule_missing)
-            return
-        }
-
-        if (paragraphNum == -1) {
-            lifecycleScope.launch {
-                val chapter = withContext(IO) {
-                    appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
-                } ?: return@launch
-                showDialogFragment(
-                    ReviewDetailDialog(
-                        reviewContext = ReviewContext.ChapterReview(
-                            source = source,
-                            book = book,
-                            chapter = chapter,
-                            reviewData = reviewData,
-                        ),
-                        rule = rule,
-                        totalCount = count,
-                    )
+            showDialogFragment(
+                ReviewDetailDialog(
+                    reviewContext = reviewContext,
+                    rule = rule,
+                    totalCount = count,
                 )
-            }
-            return
-        }
-
-        showDialogFragment(
-            ReviewDetailDialog(
-                paragraphNum = paragraphNum,
-                totalCount = count,
-                chapterIndex = chapterIndex,
-                paragraphData = reviewData,
-                bookUrl = book.bookUrl,
-                sourceKey = source.getKey(),
-                ruleHash = rule.hashCode()
             )
-        )
+        }
     }
 
     private fun loadReviewSummaryIfNeeded() {
