@@ -8,7 +8,7 @@ import io.legado.app.data.entities.BookSource
  * Runtime-only review scope. This deliberately stays outside BookSource/ReviewRule so importing
  * existing sources and merging upstream entity/schema changes remain unaffected.
  */
-internal sealed interface ReviewContext {
+sealed interface ReviewContext {
 
     val source: BookSource
     val book: Book
