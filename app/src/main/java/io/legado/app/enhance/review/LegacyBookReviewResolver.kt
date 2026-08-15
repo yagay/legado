@@ -25,6 +25,10 @@ internal object LegacyBookReviewResolver {
     /**
      * Third-party Fanqie aggregate APIs that historically append whole-book comments from
      * /api/comment into every chapter body. Move that protocol into the shared review UI instead.
+     *
+     * Older source rules only consumed name/text/score/counts even when the upstream response
+     * contained richer metadata. Probe the common response shapes here so avatar/time/images/tags
+     * survive when the API provides them; missing fields simply resolve to blank values.
      */
     private fun resolveFanqieAggregateComments(source: BookSource, book: Book): ReviewRule? {
         if (!isFanqieAggregateCommentProtocol(source)) return null
@@ -40,8 +44,32 @@ internal object LegacyBookReviewResolver {
             "var x=d&&d.data&&d.data.data;" +
             "x&&x.has_more?'$sourceBase/api/comment?book_id=$bookId&count=50&offset='+" +
             "(parseInt(page)*50):''"
+        val avatarRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);" +
+            "var u=c.user_info||c.user||{};" +
+            "String(u.user_avatar||u.avatar_url||u.avatar||u.user_avatar_url||u.avatar_uri||'')"
+        val nameRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);" +
+            "var u=c.user_info||c.user||{};" +
+            "String(u.user_name||u.nickname||u.name||c.user_name||'匿名用户')"
+        val badgeRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);" +
+            "var u=c.user_info||c.user||{};var b=[];" +
+            "if(c.score!==undefined&&c.score!==null&&String(c.score)!=='')b.push('⭐ '+c.score);" +
+            "if(u.is_author||c.is_author)b.push('作者');" +
+            "var tags=c.tags||u.tags||[];if(Array.isArray(tags)){for(var i=0;i<tags.length;i++){" +
+            "var t=tags[i];if(t&&typeof t==='object')t=t.name||t.text||t.title;if(t)b.push(String(t));}}" +
+            "JSON.stringify(b)"
         val contentRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);" +
-            "JSON.stringify({text:String(c.text||''),likeCount:Number(c.digg_count||0)," +
+            "var t=String(c.text||c.content||'');" +
+            "var e={'[微笑]':'🙂','[偷笑]':'🤭','[笑]':'😄','[什么]':'❓','[害羞]':'😊','[爱慕]':'😍'," +
+            "'[飞吻]':'😘','[奸笑]':'😏','[尬笑]':'😅','[思考]':'🤔','[撇嘴]':'😒','[做鬼脸]':'😜'," +
+            "'[酷]':'😎','[翻白眼]':'🙄','[惊呆]':'😲','[震惊]':'😱','[送心]':'💗','[委屈]':'🥺','[快哭了]':'😢'};" +
+            "for(var k in e)t=t.split(k).join(e[k]);" +
+            "var tm=c.create_time||c.create_time_str||c.publish_time||c.comment_time||c.created_at||c.createdAt||'';" +
+            "if(!tm&&c.create_timestamp){var n=Number(c.create_timestamp);if(n<1000000000000)n*=1000;" +
+            "try{tm=new Date(n).toLocaleString();}catch(x){tm=String(c.create_timestamp);}}" +
+            "var img='';var im=c.images||c.image_list||c.pictures||c.image_url||c.image;" +
+            "if(Array.isArray(im)&&im.length){var p=im[0];img=typeof p==='string'?p:(p.url||p.image_url||p.src||'');}" +
+            "else if(typeof im==='string')img=im;else if(im&&typeof im==='object')img=im.url||im.image_url||im.src||'';" +
+            "JSON.stringify({text:t,img:img,time:String(tm||''),likeCount:Number(c.digg_count||c.like_count||0)," +
             "replyCount:Number(c.reply_count||0)})"
 
         return ReviewRule(
@@ -49,8 +77,10 @@ internal object LegacyBookReviewResolver {
             reviewDetailUrl = firstUrl,
             reviewDetailNextPageUrl = nextUrlRule,
             detailListRule = "$.data.data.comment",
-            detailNameRule = "$.user_info.user_name",
-            detailBadgeRule = "$.score",
+            detailIdRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);String(c.comment_id||c.id||'')",
+            detailAvatarRule = avatarRule,
+            detailNameRule = nameRule,
+            detailBadgeRule = badgeRule,
             detailContentRule = contentRule,
         )
     }
@@ -68,14 +98,19 @@ internal object LegacyBookReviewResolver {
         } else {
             "$bookUrl/comment"
         }
+        val contentRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);" +
+            "JSON.stringify({text:String(c.content||''),time:String(c.createdAt||c.createTime||'')," +
+            "likeCount:Number(c.praiseCount||c.likeCount||0)})"
 
         return ReviewRule(
             enabled = true,
             reviewDetailUrl = detailUrl,
             detailListRule = "$.data.comments",
+            detailIdRule = "$.id",
+            detailAvatarRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);var u=c.createrId||c.creator||{};String(u.avatar||u.avatarUrl||u.headImg||'')",
             detailNameRule = "$.createrId.userName",
             detailBadgeRule = "$.score",
-            detailContentRule = "$.content",
+            detailContentRule = contentRule,
         )
     }
 
@@ -88,17 +123,16 @@ internal object LegacyBookReviewResolver {
             .trimEnd('/')
         if (!bookUrl.contains("douban.com/subject/")) return null
 
-        // Long reviews are attempted first by LegacyBookReviewLoader. This rule is also the
-        // compatible short-comment fallback used by sources that switch to /comments/ when no
-        // long reviews exist.
         return ReviewRule(
             enabled = true,
             reviewDetailUrl = "$bookUrl/comments/",
             reviewDetailNextPageUrl = "text.后一页@href||class.next@tag.a@href",
             detailListRule = "class.comment-item||class.grid_view@tag.ul@tag.li||class.comment@tag.li",
+            detailAvatarRule = "class.avatar@tag.img@src||tag.img.0@src",
             detailNameRule = "class.comment-info@tag.a.0@text||tag.a.0@text",
             detailBadgeRule = "class.rating@title||class.rating@class",
-            detailContentRule = "class.short@text||class.comment-content@text||class.comment@tag.p@text",
+            detailContentRule = "@js:var text=java.getString('class.short@text||class.comment-content@text||class.comment@tag.p@text');" +
+                "var tm=java.getString('class.comment-time@title||class.comment-time@text');JSON.stringify({text:text,time:tm})",
         )
     }
 
@@ -109,20 +143,21 @@ internal object LegacyBookReviewResolver {
         if (!detailUrl.contains("detailadr.reader.qq.com/") || !detailUrl.contains("bid=")) {
             return null
         }
+        val contentRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);" +
+            "JSON.stringify({text:String(c.content||c.text||''),time:String(c.time||c.create_time||c.created_at||'')," +
+            "likeCount:Number(c.like_count||c.digg_count||0),replyCount:Number(c.reply_count||0)})"
 
         return ReviewRule(
             enabled = true,
             reviewDetailUrl = detailUrl,
             detailListRule = "$..commentlist[*]",
-            detailContentRule = "$.content",
+            detailIdRule = "$.id",
+            detailAvatarRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);var u=c.user||c.userInfo||{};String(c.avatar||u.avatar||u.avatarUrl||'')",
+            detailNameRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);var u=c.user||c.userInfo||{};String(c.nick||c.nickname||u.nick||u.nickname||u.name||'')",
+            detailContentRule = contentRule,
         )
     }
 
-    /**
-     * Older JJWXC sources already request a whole-book preview list with only novelId and parse
-     * data.commentList. Keep that scope separate from chapter comments such as comment_json.php,
-     * which also require chapterId and therefore belong to chapter review rather than BookReview.
-     */
     private fun resolveJjwxcBookComments(source: BookSource, book: Book): ReviewRule? {
         if (!isJjwxcBookCommentProtocol(source)) return null
 
@@ -131,14 +166,18 @@ internal object LegacyBookReviewResolver {
             ?.groupValues
             ?.getOrNull(1)
             ?: return null
+        val contentRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);" +
+            "JSON.stringify({text:String(c.commentBody||''),time:String(c.commentDate||c.postTime||'')})"
 
         return ReviewRule(
             enabled = true,
             reviewDetailUrl = "https://android.jjwxc.net/comment/getCommentList?versionCode=268&novelId=$novelId&limit=5",
             detailListRule = "$.data.commentList",
+            detailIdRule = "$.commentId",
+            detailAvatarRule = "@js:var c=(typeof result==='string'?JSON.parse(result):result);String(c.avatar||c.userAvatar||c.commentAvatar||'')",
             detailNameRule = "$.commentAuthor",
             detailBadgeRule = "$.ip_pos",
-            detailContentRule = "$.commentBody",
+            detailContentRule = contentRule,
         )
     }
 
