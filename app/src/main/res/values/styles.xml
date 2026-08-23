@@ -33,6 +33,9 @@
         <item name="colorPrimaryDark">@color/primaryDark</item>
         <item name="colorAccent">@color/accent</item>
         <item name="colorControlActivated">@color/accent</item>
+        <item name="colorControlNormal">?android:attr/textColorSecondary</item>
+        <item name="colorControlHighlight">@color/btn_bg_press</item>
+        <item name="colorButtonNormal">@color/background_card</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="actionOverflowMenuStyle">@style/Style.PopupMenu</item>
         <item name="android:itemTextAppearance">@style/Style.MenuItemText</item>
