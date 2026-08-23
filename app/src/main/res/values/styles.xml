@@ -23,15 +23,22 @@
         <item name="android:windowNoTitle">true</item>
     </style>
 
-    <!-- Base application theme. -->
+    <!--
+        Base application theme.
+        Keep the existing runtime ThemeStore colors, but use softer OxygenOS-like chrome:
+        transparent system bars, low visual elevation and rounded transient surfaces.
+    -->
     <style name="Base.AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryDark">@color/primaryDark</item>
         <item name="colorAccent">@color/accent</item>
+        <item name="colorControlActivated">@color/accent</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="actionOverflowMenuStyle">@style/Style.PopupMenu</item>
         <item name="android:itemTextAppearance">@style/Style.MenuItemText</item>
         <item name="android:popupMenuStyle">@style/Style.PopupMenu</item>
         <item name="android:statusBarColor">@color/transparent</item>
+        <item name="android:navigationBarColor">@color/transparent</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 
@@ -65,6 +72,7 @@
         <item name="android:textSize">16sp</item>
     </style>
 
+    <!-- OxygenOS-like rounded transient surface; menu contents and ordering stay unchanged. -->
     <style name="Style.PopupMenu" parent="Widget.AppCompat.PopupMenu">
         <item name="android:popupBackground">@drawable/bg_popup_menu</item>
     </style>
@@ -78,8 +86,11 @@
         <item name="android:windowAnimationStyle">@null</item>
     </style>
 
+    <!-- Slightly larger/stronger title hierarchy without changing toolbar geometry. -->
     <style name="ToolbarTitle" parent="@style/TextAppearance.Widget.AppCompat.Toolbar.Title">
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">sans-serif</item>
     </style>
 
     //*******************Widget Style**********************************//
@@ -130,6 +141,8 @@
     <style name="dialog_style" parent="@android:style/Theme.Dialog">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowDimAmount">0.32</item>
     </style>
 
     <style name="SleepTimerOption" parent="android:Widget.TextView">
