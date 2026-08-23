@@ -142,7 +142,7 @@
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:backgroundDimEnabled">true</item>
-        <item name="android:windowDimAmount">0.32</item>
+        <item name="android:backgroundDimAmount">0.32</item>
     </style>
 
     <style name="SleepTimerOption" parent="android:Widget.TextView">
