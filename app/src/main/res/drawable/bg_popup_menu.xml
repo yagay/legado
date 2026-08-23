@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
-       android:shape="rectangle">
+    android:shape="rectangle">
 
-    <solid android:color="@color/background_menu"/>
+    <solid android:color="@color/background_menu" />
 
-    <corners android:radius="2dp"/>
+    <!-- OxygenOS-like soft floating surface; menu item layout is unchanged. -->
+    <corners android:radius="18dp" />
+
+    <padding
+        android:left="4dp"
+        android:top="4dp"
+        android:right="4dp"
+        android:bottom="4dp" />
 
 </shape>
