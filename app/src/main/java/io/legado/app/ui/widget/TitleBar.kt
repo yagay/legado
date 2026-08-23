@@ -26,7 +26,6 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.getToolbarTextColor
 import io.legado.app.lib.theme.transparentNavBar
-import io.legado.app.ui.widget.text.BadgeView
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyTint
@@ -207,10 +206,14 @@ class TitleBar @JvmOverloads constructor(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         attachToActivity()
-        if (automaticForeground) {
-            post { applyForegroundColor() }
-        } else if (!AppConfig.isEInkMode) {
-            post { applySurfaceForegroundColor() }
+        if (!AppConfig.isEInkMode) {
+            post {
+                if (usesTransparentForeground) {
+                    applyForegroundColor()
+                } else {
+                    applySurfaceForegroundColor()
+                }
+            }
         }
     }
 
