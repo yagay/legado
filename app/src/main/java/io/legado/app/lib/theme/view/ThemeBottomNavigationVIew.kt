@@ -19,7 +19,6 @@ import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.bottomBackground
-import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.getSecondaryTextColor
 import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.ui.widget.text.BadgeView
@@ -46,8 +45,10 @@ class ThemeBottomNavigationVIew(context: Context, attrs: AttributeSet) :
             setBackgroundColor(Color.TRANSPARENT)
         } else {
             setBackgroundColor(bgColor)
-            elevation = context.elevation
         }
+        // OxygenOS-style bottom chrome stays visually attached to the page instead of floating
+        // above it with the traditional Material shadow. Item order, menus and skin support stay intact.
+        elevation = 0f
         val textIsDark = ColorUtils.isColorLight(bgColor)
         val textColor = context.getSecondaryTextColor(textIsDark)
         val colorStateList = Selector.colorBuild()
@@ -57,8 +58,9 @@ class ThemeBottomNavigationVIew(context: Context, attrs: AttributeSet) :
         themeIconTint = colorStateList
         itemIconTintList = colorStateList
         itemTextColor = colorStateList
+        itemIconSize = 25.dpToPx()
+        isItemHorizontalTranslationEnabled = false
         if (AppConfig.isEInkMode || transparentNavBar) {
-            isItemHorizontalTranslationEnabled = false
             itemBackground = Color.TRANSPARENT.toDrawable()
         }
 
@@ -73,7 +75,7 @@ class ThemeBottomNavigationVIew(context: Context, attrs: AttributeSet) :
     fun applySkin(iconMap: Map<Int, StateListDrawable>?, iconSizePx: Int) {
         if (iconMap == null) {
             itemIconTintList = themeIconTint
-            itemIconSize = 24.dpToPx()
+            itemIconSize = 25.dpToPx()
             defaultIcons.forEach { (id, res) ->
                 menu.findItem(id)?.icon = defaultIcon(res, tinted = false)
             }
