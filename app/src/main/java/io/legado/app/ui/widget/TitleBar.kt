@@ -16,18 +16,17 @@ import androidx.annotation.StyleRes
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.graphics.alpha
-import androidx.core.view.forEach
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.children
+import androidx.core.view.forEach
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.backgroundColor
-import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.getToolbarTextColor
-import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.transparentNavBar
+import io.legado.app.ui.widget.text.BadgeView
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyTint
@@ -132,7 +131,6 @@ class TitleBar @JvmOverloads constructor(
                 this.setSubtitleTextColor(a.getColor(R.styleable.TitleBar_subtitleTextColor, -0x1))
             }
 
-
             if (a.hasValue(R.styleable.TitleBar_contentInsetLeft)
                 || a.hasValue(R.styleable.TitleBar_contentInsetRight)
             ) {
@@ -177,14 +175,6 @@ class TitleBar @JvmOverloads constructor(
         }
 
         if (!isInEditMode) {
-//            if (fitStatusBar) {
-//                setPadding(paddingLeft, context.statusBarHeight, paddingRight, paddingBottom)
-//            }
-//
-//            if (fitNavigationBar) {
-//                setPadding(paddingLeft, paddingTop, paddingRight, context.navigationBarHeight)
-//            }
-
             if (fitStatusBar || fitNavigationBar) {
                 setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
                     val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -203,8 +193,10 @@ class TitleBar @JvmOverloads constructor(
             } else if (!opaque && context.transparentNavBar) {
                 setBackgroundColor(Color.TRANSPARENT)
             } else {
-                setBackgroundColor(context.primaryColor)
-                elevation = context.elevation
+                // OxygenOS-like app chrome: the top bar belongs to the page surface instead of
+                // forming a separate saturated/elevated slab. Navigation/menu layout is unchanged.
+                setBackgroundColor(context.backgroundColor)
+                elevation = 0f
             }
 
             stateListAnimator = null
@@ -217,6 +209,8 @@ class TitleBar @JvmOverloads constructor(
         attachToActivity()
         if (automaticForeground) {
             post { applyForegroundColor() }
+        } else if (!AppConfig.isEInkMode) {
+            post { applySurfaceForegroundColor() }
         }
     }
 
@@ -226,7 +220,15 @@ class TitleBar @JvmOverloads constructor(
 
     fun applyForegroundColor() {
         if (!usesTransparentForeground) return
-        val color = context.getToolbarTextColor(true)
+        applyToolbarForeground(context.getToolbarTextColor(true))
+    }
+
+    private fun applySurfaceForegroundColor() {
+        if (usesTransparentForeground) return
+        applyToolbarForeground(context.getToolbarTextColor(true))
+    }
+
+    private fun applyToolbarForeground(color: Int) {
         if (!titleTextColorFromAttrs) {
             setTitleTextColor(color)
         }
@@ -313,10 +315,6 @@ class TitleBar @JvmOverloads constructor(
     }
 
     fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, fullScreen: Boolean) {
-//        if (fitStatusBar) {
-//            val topPadding = if (!isInMultiWindowMode && fullScreen) context.statusBarHeight else 0
-//            setPadding(paddingLeft, topPadding, paddingRight, paddingBottom)
-//        }
     }
 
     private fun attachToActivity() {
