@@ -11,6 +11,7 @@ on:
   pull_request:
     paths-ignore:
       - '**/modules/web/**'
+      - '.github/quick-build-trigger/**'
   workflow_run:
     workflows: [Build Web]
     branches: [master]
